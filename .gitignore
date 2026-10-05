@@ -1,0 +1,13 @@
+# Archivos de sesión temporales (subidas efímeras)
+temp_uploads/*
+!temp_uploads/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
