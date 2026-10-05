@@ -43,8 +43,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // 2. Análisis Léxico (Tokenizador)
-    $tokenizador = new Tokenizador($codigo);
-    $tokens = $tokenizador->tokenizar();
+    require_once __DIR__ . '/src/TablaLexica.php';
+    $tablaLexica = new Latinex\TablaLexica();
+    $tokenizador = new Latinex\Tokenizador($codigo, $tablaLexica);
+    
+    $tokens = [];
+    while (true) {
+        $token = $tokenizador->getToken();
+        $tokens[] = [
+            'token' => $token->token,
+            'lexema' => $token->lexema,
+            'linea' => $token->linea,
+            'columna' => $token->columna
+        ];
+        if ($token->token === Latinex\T_FIN) {
+            break;
+        }
+    }
 
     // 3. Respuesta de Prueba (Retornamos JSON para validar el tokenizador)
     // Cuando PdfGenerator esté listo, esto se cambiará a Content-Type: application/pdf

@@ -1,195 +1,291 @@
 <?php
-
 namespace Latinex;
 
-require_once __DIR__ . '/TablaLexica.php';
+class Tokenizador
+{
+    private string $codigo;
+    private int $indice = 0;
+    private int $linea = 1;
+    private int $columna = 1;
+    private TablaLexica $tablaLexica;
+    
+    // Estado para saber si estamos dentro de corchetes de atributos [...]
+    private bool $enAtributos = false;
 
-class Tokenizador {
-    private $codigo;
-    private $posicion;
-    private $longitud;
-    private $tokens;
-    private $nivelLlaves;
-
-    public function __construct($codigo) {
+    public function __construct(string $codigo, TablaLexica $tablaLexica)
+    {
         $this->codigo = $codigo;
-        $this->posicion = 0;
-        $this->longitud = mb_strlen($codigo, 'UTF-8');
-        $this->tokens = [];
-        $this->nivelLlaves = 0;
+        $this->tablaLexica = $tablaLexica;
     }
 
-    public function tokenizar() {
-        while ($this->posicion < $this->longitud) {
-            $char = $this->obtenerCharActual();
+    public function getToken(): Token
+    {
+        // Si estamos en atributos, omitimos espacios en blanco
+        if ($this->enAtributos) {
+            $this->OmitirEspacios();
+        }
 
-            // Ignorar comentarios que inician con // hasta el salto de línea
-            if ($char === '/' && $this->mirarAdelante() === '/') {
-                $this->saltarComentario();
+        if ($this->FinCodigo()) {
+            return new Token(T_FIN, null, $this->linea, $this->columna);
+        }
+
+        $lineaInicial = $this->linea;
+        $columnaInicial = $this->columna;
+
+        $caracter = $this->obtenerCharActual();
+
+        // 1. COMENTARIOS (//)
+        if ($caracter === '/' && $this->mirarAdelante() === '/') {
+            return new Token(T_COMENTARIO, $this->LeerComentario(), $lineaInicial, $columnaInicial);
+        }
+
+        // 2. COMANDOS EMPEZANDO CON # O @
+        if ($caracter === '#' || $caracter === '@') {
+            $lexema = $this->LeerComando();
+            $elemento = $this->tablaLexica->BuscarPorLexema($lexema);
+            
+            if ($elemento !== null) {
+                return new Token($elemento['token'], $lexema, $lineaInicial, $columnaInicial);
+            } else {
+                // Si no existe en la tabla, se considera texto plano o error. Lo trataremos como texto.
+                return new Token(T_TEXTO_PLANO, $lexema, $lineaInicial, $columnaInicial);
+            }
+        }
+
+        // 3. SÍMBOLOS FIJOS ({, }, [, ], =, ,)
+        $elementoFijo = $this->LeerLexemaFijo();
+        if ($elementoFijo !== null) {
+            // Actualizar estado de atributos
+            if ($elementoFijo['token'] === T_ACOR) {
+                $this->enAtributos = true;
+            } elseif ($elementoFijo['token'] === T_CCOR) {
+                $this->enAtributos = false;
+            }
+
+            return new Token($elementoFijo['token'], $elementoFijo['lexema'], $lineaInicial, $columnaInicial);
+        }
+
+        // 4. MODO ATRIBUTOS: Leer Identificadores o Cadenas
+        if ($this->enAtributos) {
+            if (ctype_alpha($caracter)) {
+                $lexema = $this->LeerIdentificador();
+                return new Token(T_ID, $lexema, $lineaInicial, $columnaInicial);
+            }
+            if ($caracter === '"' || $caracter === "'") {
+                $lexema = $this->LeerCadena($caracter);
+                if ($lexema === null) {
+                    return new Token(T_ERROR, null, $lineaInicial, $columnaInicial);
+                }
+                return new Token(T_CADENA, $lexema, $lineaInicial, $columnaInicial);
+            }
+            
+            // Si es un número en los atributos (opcional)
+            if (ctype_digit($caracter)) {
+                $lexema = $this->LeerNumero();
+                if ($lexema === null) {
+                    return new Token(T_ERROR, null, $lineaInicial, $columnaInicial);
+                }
+                return new Token(T_TEXTO_PLANO, $lexema, $lineaInicial, $columnaInicial); // Números como texto plano
+            }
+        }
+
+        // 5. MODO TEXTO PLANO
+        // Si no estamos en atributos, o no encaja con lo anterior, es texto plano.
+        $lexema = $this->LeerTextoPlano();
+        if ($lexema !== '') {
+            return new Token(T_TEXTO_PLANO, $lexema, $lineaInicial, $columnaInicial);
+        }
+
+        // Si por alguna razón cae aquí, devolvemos error
+        $lexema = $caracter;
+        $this->Avanzar();
+        return new Token(T_ERROR, $lexema, $lineaInicial, $columnaInicial);
+    }
+
+    private function OmitirEspacios(): void
+    {
+        while (!$this->FinCodigo()) {
+            $caracter = $this->obtenerCharActual();
+            if (!ctype_space($caracter)) {
+                break;
+            }
+            $this->Avanzar();
+        }
+    }
+
+    private function LeerComentario(): string
+    {
+        $lexema = '';
+        while (!$this->FinCodigo()) {
+            $caracter = $this->obtenerCharActual();
+            if ($caracter === "\n") {
+                $this->Avanzar(); // Consumir el salto de línea
+                break;
+            }
+            $lexema .= $caracter;
+            $this->Avanzar();
+        }
+        return $lexema;
+    }
+
+    private function LeerComando(): string
+    {
+        $lexema = '';
+        while (!$this->FinCodigo()) {
+            $caracter = $this->obtenerCharActual();
+            // Comandos permitidos: empiezan con # o @, seguidos de letras o guion bajo
+            if ($caracter === '#' || $caracter === '@' || ctype_alpha($caracter) || $caracter === '_') {
+                $lexema .= $caracter;
+                $this->Avanzar();
+            } else {
+                break;
+            }
+        }
+        return $lexema;
+    }
+
+    private function LeerIdentificador(): string
+    {
+        $lexema = '';
+        while (!$this->FinCodigo()) {
+            $caracter = $this->obtenerCharActual();
+            if (!ctype_alpha($caracter) && !ctype_digit($caracter) && $caracter !== '_') {
+                break;
+            }
+            $lexema .= $caracter;
+            $this->Avanzar();
+        }
+        return $lexema;
+    }
+
+    private function LeerNumero(): ?string
+    {
+        $lexema = '';
+        $cantidadPuntos = 0;
+        while (!$this->FinCodigo()) {
+            $caracter = $this->obtenerCharActual();
+            if (ctype_digit($caracter)) {
+                $lexema .= $caracter;
+                $this->Avanzar();
+                continue;
+            }
+            if ($caracter === '.') {
+                $cantidadPuntos++;
+                if ($cantidadPuntos > 1) {
+                    $this->Avanzar();
+                    return null;
+                }
+                $lexema .= $caracter;
+                $this->Avanzar();
+                continue;
+            }
+            break;
+        }
+        return $lexema;
+    }
+
+    private function LeerCadena(string $delimitador): ?string
+    {
+        $this->Avanzar(); // Consumir comilla inicial
+        $lexema = '';
+        while (!$this->FinCodigo()) {
+            $caracter = $this->obtenerCharActual();
+            if ($caracter === '\\') {
+                $this->Avanzar();
+                if (!$this->FinCodigo()) {
+                    $lexema .= $this->obtenerCharActual();
+                    $this->Avanzar();
+                }
+                continue;
+            }
+            if ($caracter === $delimitador) {
+                $this->Avanzar();
+                return $lexema;
+            }
+            $lexema .= $caracter;
+            $this->Avanzar();
+        }
+        return null; // Falta comilla de cierre
+    }
+
+    private function LeerTextoPlano(): string
+    {
+        $lexema = '';
+        while (!$this->FinCodigo()) {
+            $caracter = $this->obtenerCharActual();
+
+            // Si escapamos el carácter, lo tomamos literal
+            if ($caracter === '\\') {
+                $this->Avanzar();
+                if (!$this->FinCodigo()) {
+                    $lexema .= $this->obtenerCharActual();
+                    $this->Avanzar();
+                }
                 continue;
             }
 
-            if ($this->nivelLlaves > 0) {
-                // MODO BLOQUE: Capturar todo como texto a menos que sea comando o llave
-                if ($char === '}') {
-                    $this->agregarToken(TablaLexica::T_LLAVE_CIERRA, '}');
-                    $this->nivelLlaves--;
-                    $this->avanzar();
-                } else if ($char === '#') {
-                    $this->agregarToken(TablaLexica::T_NUMERAL, '#');
-                    $this->avanzar();
-                    $this->leerEtiqueta();
-                } else if ($char === '{') {
-                    $this->agregarToken(TablaLexica::T_LLAVE_ABRE, '{');
-                    $this->nivelLlaves++;
-                    $this->avanzar();
-                } else {
-                    $this->leerBloqueTexto();
-                }
-            } else {
-                // MODO NORMAL: Fuera de bloques de texto (se ignoran espacios libres)
-                if (preg_match('/\s/', $char)) {
-                    $this->avanzar();
-                    continue;
-                }
-
-                switch ($char) {
-                    case '#':
-                        $this->agregarToken(TablaLexica::T_NUMERAL, '#');
-                        $this->avanzar();
-                        $this->leerEtiqueta();
-                        break;
-                    case '(':
-                        $this->agregarToken(TablaLexica::T_PARENTESIS_ABRE, '(');
-                        $this->avanzar();
-                        $this->leerAtributos();
-                        break;
-                    case '{':
-                        $this->agregarToken(TablaLexica::T_LLAVE_ABRE, '{');
-                        $this->nivelLlaves++;
-                        $this->avanzar();
-                        break;
-                    case '}':
-                        $this->agregarToken(TablaLexica::T_LLAVE_CIERRA, '}');
-                        if ($this->nivelLlaves > 0) $this->nivelLlaves--;
-                        $this->avanzar();
-                        break;
-                    default:
-                        $this->avanzar();
-                        break;
-                }
-            }
-        }
-        
-        $this->agregarToken(TablaLexica::T_EOF, '');
-        return $this->tokens;
-    }
-
-    private function saltarComentario() {
-        while ($this->posicion < $this->longitud) {
-            $char = $this->obtenerCharActual();
-            $this->avanzar();
-            if ($char === "\n" || $char === "\r") {
+            // Si encontramos inicio de un comando, bloque, o comentario, paramos.
+            if ($caracter === '#' || $caracter === '@' || $caracter === '{' || $caracter === '}' || $caracter === '[' || $caracter === ']') {
                 break;
             }
-        }
-    }
-
-    private function mirarAdelante() {
-        if ($this->posicion + 1 < $this->longitud) {
-            return mb_substr($this->codigo, $this->posicion + 1, 1, 'UTF-8');
-        }
-        return null;
-    }
-
-    private function leerEtiqueta() {
-        $etiqueta = '';
-        while ($this->posicion < $this->longitud) {
-            $char = $this->obtenerCharActual();
-            if (preg_match('/[a-zA-Z0-9_-]/', $char)) {
-                $etiqueta .= $char;
-                $this->avanzar();
-            } else {
-                break;
-            }
-        }
-        
-        if (!empty($etiqueta)) {
-            $this->agregarToken(TablaLexica::T_ETIQUETA, $etiqueta);
-        }
-    }
-
-    private function leerAtributos() {
-        $buffer = '';
-        while ($this->posicion < $this->longitud) {
-            $char = $this->obtenerCharActual();
-            if ($char === ')') {
-                if (!empty(trim($buffer))) {
-                    $this->procesarBufferAtributos($buffer);
-                }
-                $this->agregarToken(TablaLexica::T_PARENTESIS_CIERRA, ')');
-                $this->avanzar();
-                break;
-            }
-            $buffer .= $char;
-            $this->avanzar();
-        }
-    }
-    
-    private function procesarBufferAtributos($buffer) {
-        $pares = explode(',', $buffer);
-        foreach ($pares as $par) {
-            $partes = explode('=', $par);
-            if (count($partes) === 2) {
-                $this->agregarToken(TablaLexica::T_ATRIBUTO, trim($partes[0]));
-                $this->agregarToken(TablaLexica::T_IGUAL, '=');
-                $this->agregarToken(TablaLexica::T_VALOR_ATRIBUTO, trim($partes[1]));
-            } else {
-                $this->agregarToken(TablaLexica::T_ATRIBUTO, trim($partes[0]));
-            }
-        }
-    }
-
-    /**
-     * Captura el texto interno hasta encontrar una llave de cierre, apertura o un nuevo comando.
-     * Soporta escape de caracteres con \ (backslash).
-     */
-    private function leerBloqueTexto() {
-        $texto = '';
-        while ($this->posicion < $this->longitud) {
-            $char = $this->obtenerCharActual();
             
-            if ($char === '#' || $char === '{' || $char === '}') {
+            // También paramos si vemos un '//' (comentario)
+            if ($caracter === '/' && $this->mirarAdelante() === '/') {
                 break;
-            } else if ($char === '\\') {
-                $this->avanzar();
-                if ($this->posicion < $this->longitud) {
-                    $texto .= $this->obtenerCharActual();
-                    $this->avanzar();
-                }
-            } else {
-                $texto .= $char;
-                $this->avanzar();
             }
+
+            $lexema .= $caracter;
+            $this->Avanzar();
+        }
+        return $lexema;
+    }
+
+    private function LeerLexemaFijo(): ?array
+    {
+        $elemento = $this->tablaLexica->BuscarLexemaMasLargo($this->codigo, $this->indice);
+        if ($elemento === null) {
+            return null;
         }
         
-        if ($texto !== '') {
-            $this->agregarToken(TablaLexica::T_TEXTO_PLANO, $texto);
+        for ($i = 0; $i < $elemento['longitud']; $i++) {
+            $this->Avanzar();
         }
+        
+        return $elemento;
     }
 
-    private function obtenerCharActual() {
-        return mb_substr($this->codigo, $this->posicion, 1, 'UTF-8');
+    private function obtenerCharActual(): string
+    {
+        return mb_substr($this->codigo, $this->indice, 1, 'UTF-8');
     }
 
-    private function avanzar() {
-        $this->posicion++;
+    private function mirarAdelante(): string
+    {
+        if ($this->indice + 1 >= mb_strlen($this->codigo, 'UTF-8')) {
+            return '';
+        }
+        return mb_substr($this->codigo, $this->indice + 1, 1, 'UTF-8');
     }
 
-    private function agregarToken($tipo, $valor) {
-        $this->tokens[] = [
-            'tipo' => $tipo,
-            'valor' => $valor
-        ];
+    private function Avanzar(): void
+    {
+        if ($this->FinCodigo()) {
+            return;
+        }
+
+        $caracter = $this->obtenerCharActual();
+        if ($caracter === "\n") {
+            $this->linea++;
+            $this->columna = 1;
+        } else {
+            $this->columna++;
+        }
+        
+        $this->indice++;
+    }
+
+    private function FinCodigo(): bool
+    {
+        return $this->indice >= mb_strlen($this->codigo, 'UTF-8');
     }
 }
