@@ -12,17 +12,34 @@ class TablaLexica {
     const T_ATRIBUTO = 'T_ATRIBUTO';
     const T_IGUAL = 'T_IGUAL';
     const T_VALOR_ATRIBUTO = 'T_VALOR_ATRIBUTO';
-    const T_TEXTO_BLOQUE = 'T_TEXTO_BLOQUE';
+    const T_TEXTO_PLANO = 'T_TEXTO_PLANO';
     const T_EOF = 'T_EOF';
     
     // Diccionario de etiquetas permitidas (reservadas) en el lenguaje Latinex
     public static $etiquetasPermitidas = [
-        'titulo',
         'texto',
+        'fuerte',
+        'cursiva',
+        'titulo',
         'autor',
-        'imagen',
         'seccion',
-        'negrita',
-        'cursiva'
+        'subseccion',
+        'subseccion2',
+        'salto',
+        'nuevapagina',
+        'definir',
+        'imprimir',
+        'imagen',
+        'superindice',
+        'subindice',
+        'fraccion',
+        'lista',
+        'tabla',
+        'fila',
+        'celda',
+        'referencia',
+        'indicegeneral',
+        'ecuacion',
+        'caja'
     ];
 }
