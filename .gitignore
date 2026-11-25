@@ -1,6 +1,12 @@
-# Archivos de sesión temporales (subidas efímeras)
+# Archivos de sesión temporales y almacenamiento de usuario
 temp_uploads/*
 !temp_uploads/.gitkeep
+storage/*
+!storage/.gitkeep
+
+# Secretos locales de entorno y estado de despliegue
+.env
+deploy/.ec2-state.json
 
 # OS
 .DS_Store

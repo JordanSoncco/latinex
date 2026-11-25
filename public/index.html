@@ -1,304 +1,705 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Latinex - Compilador a PDF</title>
-    <!-- Vue.js CDN -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-dark: #0f172a;
-            --bg-panel: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --border: #334155;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        header {
-            padding: 1.2rem 2rem;
-            background-color: var(--bg-panel);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        header h1 {
-            font-size: 1.75rem;
-            font-weight: 600;
-            background: linear-gradient(135deg, #60a5fa, #a78bfa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.5px;
-        }
-
-        .main-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 1.5rem;
-            gap: 1rem;
-        }
-
-        .left-panel {
-            border-right: 1px solid var(--border);
-        }
-
-        .toolbar {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .btn {
-            background-color: var(--accent);
-            color: white;
-            border: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 0.5rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        .btn:hover {
-            background-color: var(--accent-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-        
-        .btn:disabled {
-            background-color: var(--border);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-            color: var(--text-muted);
-        }
-
-        .file-input-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-        }
-
-        .file-input-wrapper input[type=file] {
-            font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
-        }
-        
-        .btn-outline {
-            background-color: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-main);
-            box-shadow: none;
-        }
-        
-        .btn-outline:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-            border-color: var(--text-muted);
-        }
-
-        .editor {
-            flex: 1;
-            background-color: rgba(15, 23, 42, 0.5);
-            border: 1px solid var(--border);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            color: #e2e8f0;
-            font-family: 'Fira Code', monospace;
-            font-size: 15px;
-            resize: none;
-            outline: none;
-            line-height: 1.6;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .editor:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-        }
-
-        .preview-container {
-            flex: 1;
-            background-color: #f8fafc;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: var(--bg-dark);
-            position: relative;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background-color: white;
-        }
-
-        .empty-state {
-            color: #64748b;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .empty-state p {
-            font-weight: 500;
-        }
-        
-        .image-list {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-        
-        .image-badge {
-            background-color: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--border);
-            padding: 0.4rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            backdrop-filter: blur(4px);
-        }
-        
-        .image-badge button {
-            background: rgba(239, 68, 68, 0.1);
-            border: none;
-            color: #ef4444;
-            cursor: pointer;
-            font-weight: bold;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s, color 0.2s;
-        }
-        
-        .image-badge button:hover {
-            background: #ef4444;
-            color: white;
-        }
-        
-        .session-badge {
-            background-color: rgba(255, 255, 255, 0.05);
-            padding: 0.4rem 0.8rem;
-            border-radius: 0.375rem;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            border: 1px solid var(--border);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>LATINEX Cloud — Editor Tipo Overleaf y Compilador Nativo a PDF</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
-    <div id="app">
-        <header>
-            <h1>Latinex</h1>
-            <div class="session-badge">
-                ID Sesión: <span style="font-family: 'Fira Code', monospace; color: var(--text-main);">{{ sessionId }}</span>
-            </div>
-        </header>
+  <div id="app" v-cloak class="app-shell">
+    <!-- Barra superior estilo Overleaf -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button
+          type="button"
+          class="btn btn-outline btn-icon"
+          :aria-expanded="sidebarOpen ? 'true' : 'false'"
+          aria-controls="projects-sidebar"
+          @click="sidebarOpen = !sidebarOpen"
+          title="Mostrar u ocultar panel de documentos">
+          ☰
+        </button>
 
-        <div class="main-container">
-            <!-- Panel Izquierdo: Editor y Controles -->
-            <div class="panel left-panel">
-                <div class="toolbar">
-                    <button class="btn" @click="compilar" :disabled="isCompiling">
-                        <svg v-if="!isCompiling" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                        <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-                        {{ isCompiling ? 'Compilando...' : 'Compilar Documento' }}
-                    </button>
-                    <div class="file-input-wrapper">
-                        <button class="btn btn-outline">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            Adjuntar Imagen
-                        </button>
-                        <input type="file" @change="handleFileUpload" accept="image/*" multiple>
-                    </div>
-                </div>
-                
-                <div v-if="images.length > 0" class="image-list">
-                    <div v-for="(img, index) in images" :key="index" class="image-badge">
-                        {{ img.name }}
-                        <button @click="removeImage(index)" title="Quitar imagen">&times;</button>
-                    </div>
-                </div>
-
-                <textarea class="editor" v-model="codigoFuente" spellcheck="false" placeholder="Escribe tu código Latinex aquí...
-Ejemplo:
-#titulo(size=24){Mi Primer Documento}
-#texto{Este es un párrafo de prueba.}"></textarea>
-            </div>
-
-            <!-- Panel Derecho: Previsualización -->
-            <div class="panel right-panel">
-                <div class="preview-container">
-                    <iframe v-if="pdfUrl" :src="pdfUrl"></iframe>
-                    <div v-else class="empty-state">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                        <p>La previsualización del documento aparecerá aquí</p>
-                    </div>
-                </div>
-            </div>
+        <div class="brand">
+          <span class="brand-logo" aria-hidden="true">Lx</span>
+          <h1 class="brand-name">LATINEX Cloud</h1>
+          <span class="brand-pill">PHP 8.5 · Nativo PDF</span>
         </div>
-    </div>
 
-    <style>
-        .spin {
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-    <script src="app.js"></script>
+        <div class="doc-status-group">
+          <span class="active-file-chip" :title="activeFilename">{{ activeFilename }}</span>
+          <span v-if="user && saveState === 'saved'" class="save-pill saved">Guardado</span>
+          <span v-else-if="user && saveState === 'saving'" class="save-pill guest">Guardando...</span>
+          <span v-else-if="user && saveState === 'dirty'" class="save-pill dirty">Sin guardar</span>
+          <span v-else class="save-pill guest">Modo Invitado</span>
+        </div>
+      </div>
+
+      <div class="topbar-center">
+        <button
+          type="button"
+          class="btn btn-compile"
+          :disabled="isCompiling"
+          @click="compilar"
+          title="Compilar documento (Ctrl+Enter)">
+          {{ isCompiling ? 'Compilando...' : '▶ Compilar' }}
+        </button>
+
+        <button
+          v-if="user && activeDoc"
+          type="button"
+          class="btn btn-outline"
+          :disabled="isSaving || saveState === 'saving'"
+          @click="guardarDocumentoActual(true)"
+          title="Guardar en el servidor (Ctrl+S)">
+          Guardar
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-outline"
+          :disabled="!pdfDownloadBase64"
+          @click="descargarPdf"
+          title="Descargar archivo .pdf nativo">
+          Descargar PDF
+        </button>
+
+        <select
+          class="select-control"
+          v-model="selectedCaseKey"
+          @change="cargarCasoSeleccionado"
+          aria-label="Cargar caso de prueba o plantilla">
+          <option value="">📂 Cargar Caso (01–29)...</option>
+          <option v-for="c in casosDePrueba" :key="c.key" :value="c.key">
+            {{ c.label }}
+          </option>
+        </select>
+
+        <button
+          type="button"
+          class="btn btn-outline"
+          @click="abrirTablaLexicaOficial"
+          title="Inspeccionar las 78 entradas léxicas oficiales">
+          Tabla Léxica (78)
+        </button>
+      </div>
+
+      <div class="topbar-right">
+        <div v-if="user" class="user-chip">
+          <span>{{ user.nombre }}</span>
+          <span class="user-quota-pill">{{ quota.usados }}/{{ quota.maximo }} .ltx</span>
+          <button type="button" class="btn btn-outline btn-sm" @click="cerrarSesion">
+            Salir
+          </button>
+        </div>
+        <div v-else class="topbar-right">
+          <button type="button" class="btn btn-outline" @click="abrirAuthDialog('login')">
+            Iniciar sesión
+          </button>
+          <button type="button" class="btn" @click="abrirAuthDialog('register')">
+            Crear perfil
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Barra rápida intuitiva para insertar comandos LATINEX -->
+    <nav class="snippet-ribbon" aria-label="Inserción rápida de comandos LATINEX">
+      <span class="snippet-label">Insertar rápido:</span>
+      <button
+        v-for="item in quickSnippets"
+        :key="item.label"
+        type="button"
+        class="snippet-btn"
+        :title="item.desc"
+        @click="insertarSnippet(item.code)">
+        {{ item.label }}
+      </button>
+    </nav>
+
+    <!-- Área principal de 3 paneles -->
+    <main class="workbench" :class="{ 'sidebar-collapsed': !sidebarOpen }">
+      <!-- Panel Izquierdo: Mis Documentos (.ltx) e Imágenes -->
+      <aside v-show="sidebarOpen" id="projects-sidebar" class="sidebar" aria-label="Archivos del proyecto">
+        <section v-if="user" class="sidebar-section">
+          <div class="sidebar-header">
+            <h2 class="sidebar-title">Mis Documentos</h2>
+            <button
+              type="button"
+              class="btn btn-sm"
+              :disabled="quota.usados >= quota.maximo"
+              :title="quota.usados >= quota.maximo ? 'Límite de 10 documentos alcanzado' : 'Crear nuevo archivo .ltx'"
+              @click="abrirNuevoDocDialog">
+              + Nuevo .ltx
+            </button>
+          </div>
+
+          <div class="quota-box">
+            <div class="quota-row">
+              <span>Capacidad del prototipo</span>
+              <strong>{{ quota.usados }} / {{ quota.maximo }}</strong>
+            </div>
+            <progress class="quota-progress" :value="quota.usados" :max="quota.maximo"></progress>
+          </div>
+
+          <ul class="doc-list">
+            <li
+              v-for="doc in documents"
+              :key="doc.id"
+              class="doc-item"
+              :class="{ active: activeDoc && activeDoc.id === doc.id }">
+              <button
+                type="button"
+                class="doc-select-btn"
+                @click="seleccionarDocumento(doc.id)">
+                <span class="doc-item-title">{{ doc.titulo }}</span>
+                <span class="doc-item-meta">{{ doc.nombre_archivo }} · {{ doc.bytes_tamano }} B</span>
+              </button>
+              <div class="doc-item-actions">
+                <button
+                  type="button"
+                  class="mini-action-btn"
+                  title="Renombrar archivo"
+                  @click="abrirRenombrarDialog(doc)">
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  class="mini-action-btn danger"
+                  title="Eliminar documento"
+                  @click="abrirEliminarDialog(doc)">
+                  ✕
+                </button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <section v-else class="guest-card">
+          <strong>Modo Invitado (Demo instantánea)</strong>
+          <span>Edita y compila sin registrarte; tu borrador actual se guarda localmente en este navegador.</span>
+          <span>Para guardar y continuar hasta <strong>10 archivos .ltx</strong> en el servidor AWS, inicia sesión o crea tu perfil.</span>
+          <button type="button" class="btn btn-sm" @click="abrirAuthDialog('register')">
+            Registrarme y guardar en la nube
+          </button>
+        </section>
+
+        <!-- Imágenes adjuntas -->
+        <section class="sidebar-section">
+          <div class="sidebar-header">
+            <h2 class="sidebar-title">Imágenes (.jpg)</h2>
+            <span v-if="user && activeDoc" class="save-pill guest">{{ activeImages.length }}/5</span>
+          </div>
+
+          <label class="image-upload-label">
+            <span>{{ user && activeDoc ? '+ Subir .jpg al documento' : '+ Adjuntar .jpg efímera' }}</span>
+            <input type="file" accept=".jpg,.jpeg,image/jpeg" :multiple="!user" @change="subirImagen">
+          </label>
+
+          <div v-if="user && activeDoc" class="asset-list">
+            <div v-for="img in activeImages" :key="img.id" class="asset-row">
+              <button
+                type="button"
+                class="asset-insert-btn"
+                title="Insertar #imagen(...) en el cursor"
+                @click="insertarSnippet(`\n#imagen(ruta=${img.nombre_archivo}, ancho=60%, alto=auto, alineacion=centro)\n`)">
+                {{ img.nombre_archivo }}
+              </button>
+              <button
+                type="button"
+                class="mini-action-btn danger"
+                title="Quitar imagen"
+                @click="eliminarImagenDocumento(img.id)">
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="asset-list">
+            <div v-for="(img, idx) in guestImages" :key="idx" class="asset-row">
+              <button
+                type="button"
+                class="asset-insert-btn"
+                @click="insertarSnippet(`\n#imagen(ruta=${img.name}, ancho=60%, alto=auto, alineacion=centro)\n`)">
+                {{ img.name }}
+              </button>
+              <button type="button" class="mini-action-btn danger" @click="guestImages.splice(idx, 1)">✕</button>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Panel Central: Editor con numeración de líneas -->
+      <section class="editor-pane" aria-label="Editor de código fuente LATINEX">
+        <div class="pane-subheader">
+          <span>Editor Fuente (.ltx)</span>
+          <span>Atajos: Ctrl+Enter compila <template v-if="user">· Ctrl+S guarda</template></span>
+        </div>
+
+        <div class="editor-shell">
+          <pre ref="gutterRef" class="line-gutter" aria-hidden="true"><span
+            v-for="n in totalLineas"
+            :key="n"
+            class="line-gutter-num"
+            :class="{ 'error-line': errorLine === n }">{{ n }}</span></pre>
+
+          <textarea
+            ref="editorRef"
+            class="code-textarea"
+            v-model="codigoFuente"
+            spellcheck="false"
+            aria-label="Código fuente LATINEX"
+            @input="alEditarCodigo"
+            @scroll="sincronizarScroll"
+            @click="actualizarPosicionCursor"
+            @keyup="actualizarPosicionCursor"
+            @keydown="manejarAtajosEditor"></textarea>
+        </div>
+
+        <div class="editor-footer">
+          <span>Ln {{ cursorLn }}, Col {{ cursorCol }}</span>
+          <span>{{ codigoBytes }} / 65536 B (máx. 64 KB)</span>
+        </div>
+      </section>
+
+      <!-- Panel Derecho: Visor de PDF / Vista Previa y Diagnóstico de Error -->
+      <section class="preview-pane" aria-label="Vista previa y resultado de compilación">
+        <div class="pane-subheader">
+          <span>Vista Previa del Documento</span>
+          <span class="compile-pill" :class="compilePillClass">{{ compileStatusText }}</span>
+        </div>
+
+        <div class="preview-stage">
+          <div v-if="errorPanel" class="error-card" role="alert">
+            <h2>{{ errorPanel.titulo }}</h2>
+            <div class="error-meta">{{ errorPanel.meta }}</div>
+            <p style="margin: 0;">{{ errorPanel.mensaje }}</p>
+            <div v-if="errorLine > 0">
+              <button type="button" class="btn btn-outline btn-sm" @click="irALinea(errorLine)">
+                Ir a línea {{ errorLine }} en el editor
+              </button>
+            </div>
+          </div>
+
+          <iframe
+            v-else-if="pdfUrl"
+            class="pdf-frame"
+            :src="pdfUrl"
+            title="Visor PDF nativo generado por LATINEX"></iframe>
+
+          <div v-else-if="compileResult" class="a4-preview-wrapper">
+            <div v-if="compileResult.ejecucion && !compileResult.ejecucion.implementado" class="frente2-banner">
+              <strong>Fases 1–3 ACEPTADAS ({{ compileResult.totalTokens }} tokens, {{ sintacticoPasos.length }} transiciones, {{ tablaSimbolos.length }} símbolos).</strong>
+              Vista previa estructural en vivo; el binario <code>%PDF-1.4</code> nativo se mostrará aquí al completarse Frente 2 (<code>PdfGenerator.php</code>).
+            </div>
+
+            <article class="a4-sheet">
+              <h2 class="a4-title">{{ previewData.titulo }}</h2>
+              <p v-if="previewData.autor" class="a4-author">Por {{ previewData.autor }}</p>
+
+              <template v-for="(bloque, idx) in previewData.bloques" :key="idx">
+                <h3 v-if="bloque.tipo === 'seccion'" class="a4-heading">{{ bloque.texto }}</h3>
+                <div v-else-if="bloque.tipo === 'caja'" class="a4-box" :class="bloque.estilo">{{ bloque.texto }}</div>
+                <p v-else class="a4-paragraph">{{ bloque.texto }}</p>
+              </template>
+
+              <div v-if="previewData.bloques.length === 0" class="a4-code-fallback">
+                Documento compilado sin errores. Usa #titulo, #seccion, #texto, #lista o #caja para ver estructura en la hoja.
+              </div>
+            </article>
+          </div>
+
+          <div v-else class="empty-preview">
+            <strong>Listo para compilar</strong>
+            <p style="margin: 0; font-size: 0.85rem;">
+              Presiona <strong>▶ Compilar</strong> (o <code>Ctrl+Enter</code>) para ejecutar las fases Léxico, Sintáctico, Semántico y Ejecución.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Cajón inferior plegable: Inspector de las 4 Fases del Compilador -->
+    <section class="inspector-dock" aria-label="Inspector de las 4 fases del compilador">
+      <div class="inspector-bar">
+        <div class="inspector-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            class="phase-tab"
+            :class="{ active: inspectorOpen && activeTab === 'lexico' }"
+            @click="seleccionarTab('lexico')">
+            <span class="phase-dot" :class="estadoFaseClass('lexico')"></span>
+            1. Léxico ({{ tokensAnalizados.length }})
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            class="phase-tab"
+            :class="{ active: inspectorOpen && activeTab === 'sintactico' }"
+            @click="seleccionarTab('sintactico')">
+            <span class="phase-dot" :class="estadoFaseClass('sintactico')"></span>
+            2. Sintáctico ({{ sintacticoPasos.length }})
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            class="phase-tab"
+            :class="{ active: inspectorOpen && activeTab === 'semantico' }"
+            @click="seleccionarTab('semantico')">
+            <span class="phase-dot" :class="estadoFaseClass('semantico')"></span>
+            3. Semántico ({{ tablaSimbolos.length }})
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            class="phase-tab"
+            :class="{ active: inspectorOpen && activeTab === 'ejecucion' }"
+            @click="seleccionarTab('ejecucion')">
+            <span class="phase-dot" :class="estadoFaseClass('ejecucion')"></span>
+            4. Ejecución
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          :aria-expanded="inspectorOpen ? 'true' : 'false'"
+          @click="inspectorOpen = !inspectorOpen">
+          {{ inspectorOpen ? '▼ Ocultar Inspector' : '▲ Mostrar 4 Fases' }}
+        </button>
+      </div>
+
+      <div v-show="inspectorOpen" class="inspector-body">
+        <!-- Pestaña 1: Léxico -->
+        <div v-if="activeTab === 'lexico'">
+          <div class="inspector-toolbar">
+            <span>
+              {{ showLexicalRef ? 'Especificación Oficial de Tokens LATINEX' : 'Tokens detectados en el código fuente' }}
+            </span>
+            <button type="button" class="btn btn-outline btn-sm" @click="alternarReferenciaLexica">
+              {{ showLexicalRef ? 'Ver Tokens Analizados' : 'Ver Tabla Oficial (78)' }}
+            </button>
+          </div>
+
+          <table v-if="!showLexicalRef" class="data-table">
+            <thead>
+              <tr><th>Cód</th><th>Nombre</th><th>Lexema</th><th>Categoría</th><th>Ln</th><th>Col</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(t, i) in tokensAnalizados" :key="i">
+                <td>{{ t.token }}</td>
+                <td :style="{ color: colorDeToken(t.tipo), fontWeight: 600 }">{{ t.nombre }}</td>
+                <td>{{ t.lexema ?? 'null' }}</td>
+                <td><span class="token-badge" :style="badgeStyle(t.tipo)">{{ t.tipo }}</span></td>
+                <td>{{ t.linea }}</td>
+                <td>{{ t.columna }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <table v-else class="data-table">
+            <thead>
+              <tr><th>Cód</th><th>Nombre</th><th>Lexema Base</th><th>Categoría</th><th>Descripción</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in lexicalReference" :key="e.token">
+                <td>{{ e.token }}</td>
+                <td :style="{ color: colorDeToken(e.categoria), fontWeight: 600 }">{{ e.nombre }}</td>
+                <td>{{ e.lexema ?? '—' }}</td>
+                <td><span class="token-badge" :style="badgeStyle(e.categoria)">{{ e.categoria }}</span></td>
+                <td>{{ e.descripcion }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pestaña 2: Sintáctico -->
+        <div v-else-if="activeTab === 'sintactico'">
+          <div class="inspector-toolbar">
+            <span>Autómata con pila de 22 estados (0–21) · Estado: {{ compileResult?.sintactico?.estado || 'SIN EJECUTAR' }}</span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>Paso</th><th>Estado Actual</th><th>Token</th><th>Nombre Token</th><th>Lexema</th><th>Ln:Col</th><th>Estado Sig.</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in sintacticoPasos" :key="s.paso">
+                <td>{{ s.paso }}</td>
+                <td>{{ s.estadoActual }}</td>
+                <td>{{ s.token }}</td>
+                <td>{{ s.nombreToken }}</td>
+                <td>{{ s.lexema ?? '' }}</td>
+                <td>{{ s.linea }}:{{ s.columna }}</td>
+                <td><strong>{{ s.estadoSiguiente }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pestaña 3: Semántico -->
+        <div v-else-if="activeTab === 'semantico'">
+          <div class="inspector-toolbar">
+            <span>Tabla de Símbolos (MACRO, ETIQUETA, METADATO) · Estado: {{ compileResult?.semantico?.estado || 'SIN EJECUTAR' }}</span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>Lexema</th><th>Token</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Ln:Col</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(sym, i) in tablaSimbolos" :key="i">
+                <td><strong>{{ sym.lexema }}</strong></td>
+                <td>{{ sym.token }}</td>
+                <td>{{ sym.tipo }}</td>
+                <td>{{ typeof sym.valor === 'object' ? JSON.stringify(sym.valor) : (sym.valor ?? '—') }}</td>
+                <td>{{ sym.estado }}</td>
+                <td>{{ sym.linea }}:{{ sym.columna }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pestaña 4: Ejecución -->
+        <div v-else-if="activeTab === 'ejecucion'">
+          <div class="inspector-toolbar">
+            <span>Motor Two-Pass A4 y PDF Binario · Estado: {{ compileResult?.ejecucion?.estado || 'SIN EJECUTAR' }}</span>
+          </div>
+          <pre style="margin: 0; font-family: 'Fira Code', monospace; font-size: 0.76rem; color: #cbd5e1;">{{ JSON.stringify(compileResult?.ejecucion || {}, null, 2) }}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dialog 1: Iniciar sesión / Registrarse -->
+    <dialog ref="authDialogRef" id="authDialog" closedby="any" aria-labelledby="authDialogTitle">
+      <div class="dialog-inner">
+        <div class="dialog-header">
+          <h1 id="authDialogTitle">{{ authMode === 'login' ? 'Iniciar sesión en LATINEX' : 'Crear perfil en LATINEX' }}</h1>
+          <button type="button" class="btn btn-outline btn-sm" @click="cerrarDialog('auth')">Cerrar</button>
+        </div>
+
+        <div class="auth-tabs" role="tablist">
+          <button
+            type="button"
+            class="auth-tab-btn"
+            :class="{ active: authMode === 'login' }"
+            @click="authMode = 'login'; authError = ''">
+            Iniciar sesión
+          </button>
+          <button
+            type="button"
+            class="auth-tab-btn"
+            :class="{ active: authMode === 'register' }"
+            @click="authMode = 'register'; authError = ''">
+            Registrarme
+          </button>
+        </div>
+
+        <div v-if="authError" class="form-error" role="alert">{{ authError }}</div>
+
+        <!-- Formulario de Login -->
+        <form v-if="authMode === 'login'" class="modal-form" @submit.prevent="enviarLogin">
+          <div class="field-group">
+            <label for="login-email">Correo electrónico</label>
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              autocomplete="username"
+              spellcheck="false"
+              enterkeyhint="next"
+              v-model="loginForm.correo"
+              autofocus
+              required>
+          </div>
+
+          <div class="field-group">
+            <label for="login-password">Contraseña</label>
+            <div class="password-row">
+              <input
+                id="login-password"
+                name="password"
+                :type="showLoginPass ? 'text' : 'password'"
+                autocomplete="current-password"
+                enterkeyhint="done"
+                v-model="loginForm.password"
+                required>
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                :aria-pressed="showLoginPass ? 'true' : 'false'"
+                @click="showLoginPass = !showLoginPass">
+                {{ showLoginPass ? 'Ocultar' : 'Mostrar' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-outline" @click="cerrarDialog('auth')">Seguir como invitado</button>
+            <button type="submit" class="btn" :disabled="authSubmitting">
+              {{ authSubmitting ? 'Ingresando...' : 'Iniciar sesión' }}
+            </button>
+          </div>
+        </form>
+
+        <!-- Formulario de Registro -->
+        <form v-else class="modal-form" @submit.prevent="enviarRegistro">
+          <div class="field-group">
+            <label for="register-name">Nombre completo</label>
+            <input
+              id="register-name"
+              name="nombre"
+              type="text"
+              autocomplete="name"
+              minlength="2"
+              maxlength="120"
+              enterkeyhint="next"
+              v-model="registerForm.nombre"
+              autofocus
+              required>
+          </div>
+
+          <div class="field-group">
+            <label for="register-email">Correo electrónico</label>
+            <input
+              id="register-email"
+              name="email"
+              type="email"
+              autocomplete="username"
+              spellcheck="false"
+              enterkeyhint="next"
+              v-model="registerForm.correo"
+              required>
+          </div>
+
+          <div class="field-group">
+            <label for="register-password">Contraseña nueva (mín. 8 caracteres)</label>
+            <div class="password-row">
+              <input
+                id="register-password"
+                name="new-password"
+                :type="showRegPass ? 'text' : 'password'"
+                autocomplete="new-password"
+                minlength="8"
+                enterkeyhint="done"
+                v-model="registerForm.password"
+                required>
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                :aria-pressed="showRegPass ? 'true' : 'false'"
+                @click="showRegPass = !showRegPass">
+                {{ showRegPass ? 'Ocultar' : 'Mostrar' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-outline" @click="cerrarDialog('auth')">Cancelar</button>
+            <button type="submit" class="btn btn-compile" :disabled="authSubmitting">
+              {{ authSubmitting ? 'Creando...' : 'Crear perfil' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Dialog 2: Nuevo documento .ltx -->
+    <dialog ref="newDocDialogRef" id="newDocDialog" closedby="any" aria-labelledby="newDocDialogTitle">
+      <div class="dialog-inner">
+        <div class="dialog-header">
+          <h1 id="newDocDialogTitle">Nuevo documento .ltx ({{ quota.usados + 1 }} / {{ quota.maximo }})</h1>
+          <button type="button" class="btn btn-outline btn-sm" @click="cerrarDialog('newDoc')">Cerrar</button>
+        </div>
+
+        <div v-if="docModalError" class="form-error" role="alert">{{ docModalError }}</div>
+
+        <form class="modal-form" @submit.prevent="confirmarNuevoDoc">
+          <div class="field-group">
+            <label for="new-doc-title">Título del documento</label>
+            <input id="new-doc-title" type="text" maxlength="160" v-model="newDocForm.titulo" autofocus required>
+          </div>
+
+          <div class="field-group">
+            <label for="new-doc-filename">Nombre del archivo (.ltx)</label>
+            <input id="new-doc-filename" type="text" maxlength="150" v-model="newDocForm.nombre_archivo" required>
+          </div>
+
+          <div class="field-group">
+            <label for="new-doc-template">Plantilla inicial</label>
+            <select id="new-doc-template" v-model="newDocForm.plantilla">
+              <option value="academico">Informe Académico (Título, Secciones y Caja)</option>
+              <option value="matematico">Documento Matemático (Fracciones y Ecuaciones)</option>
+              <option value="vacio">En blanco mínimo (#titulo y #texto)</option>
+            </select>
+          </div>
+
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-outline" @click="cerrarDialog('newDoc')">Cancelar</button>
+            <button type="submit" class="btn btn-compile">Crear documento</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Dialog 3: Renombrar documento -->
+    <dialog ref="renameDocDialogRef" id="renameDocDialog" closedby="any" aria-labelledby="renameDocDialogTitle">
+      <div class="dialog-inner">
+        <div class="dialog-header">
+          <h1 id="renameDocDialogTitle">Renombrar documento</h1>
+          <button type="button" class="btn btn-outline btn-sm" @click="cerrarDialog('renameDoc')">Cerrar</button>
+        </div>
+
+        <div v-if="docModalError" class="form-error" role="alert">{{ docModalError }}</div>
+
+        <form class="modal-form" @submit.prevent="confirmarRenombrarDoc">
+          <div class="field-group">
+            <label for="rename-doc-title">Título</label>
+            <input id="rename-doc-title" type="text" maxlength="160" v-model="renameDocForm.titulo" autofocus required>
+          </div>
+
+          <div class="field-group">
+            <label for="rename-doc-filename">Nombre del archivo (.ltx)</label>
+            <input id="rename-doc-filename" type="text" maxlength="150" v-model="renameDocForm.nombre_archivo" required>
+          </div>
+
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-outline" @click="cerrarDialog('renameDoc')">Cancelar</button>
+            <button type="submit" class="btn">Guardar nombre</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Dialog 4: Confirmación destructiva de borrado -->
+    <dialog ref="confirmDeleteDialogRef" id="confirmDeleteDialog" aria-labelledby="confirmDeleteDialogTitle">
+      <div class="dialog-inner">
+        <div class="dialog-header">
+          <h1 id="confirmDeleteDialogTitle">¿Eliminar documento?</h1>
+        </div>
+        <p style="margin: 0; color: var(--text-soft); font-size: 0.9rem; line-height: 1.45;">
+          Se eliminará permanentemente <strong>{{ deleteTarget?.nombre_archivo }}</strong> y sus imágenes adjuntas. Esta acción no se puede deshacer.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-outline" autofocus @click="cerrarDialog('confirmDelete')">
+            Cancelar
+          </button>
+          <button type="button" class="btn btn-danger" @click="confirmarEliminarDoc">
+            Eliminar definitivamente
+          </button>
+        </div>
+      </div>
+    </dialog>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>

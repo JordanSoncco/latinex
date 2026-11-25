@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-latinex}
+      POSTGRES_USER: ${DB_USER:-latinex}
+      POSTGRES_PASSWORD: ${DB_PASS:-latinex_dev_pass_2026}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-latinex} -d ${DB_NAME:-latinex}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-latinex}
+      DB_USER: ${DB_USER:-latinex}
+      DB_PASS: ${DB_PASS:-latinex_dev_pass_2026}
+      APP_ENV: ${APP_ENV:-production}
+      APP_SECRET: ${APP_SECRET:-cambia_este_secreto_en_produccion}
+    volumes:
+      - ./src:/var/www/html/src:ro
+      - ./api.php:/var/www/html/api.php:ro
+      - ./public:/var/www/html/public:ro
+      - ./test_lexico.php:/var/www/html/test_lexico.php:ro
+      - ./test_frente1.php:/var/www/html/test_frente1.php:ro
+      - ./test_auth_proyectos.php:/var/www/html/test_auth_proyectos.php:ro
+      - ./demo_compilador.php:/var/www/html/demo_compilador.php:ro
+      - storage_data:/var/www/html/storage
+      - temp_uploads_data:/var/www/html/temp_uploads
+
+  web:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./public:/var/www/html/public:ro
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  storage_data:
+  temp_uploads_data:
+  caddy_data:
+  caddy_config:
