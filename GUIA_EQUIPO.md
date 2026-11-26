@@ -127,16 +127,16 @@ Las tres deben terminar en **100% APROBADO**. William: agrega también `test_pdf
 
 ---
 
-## 6. Cómo llegan los cambios al servidor (despliegue automático CI/CD)
+## 6. Cómo publicar tus cambios en el servidor (`http://3.151.208.72/`)
 
 ```mermaid
 flowchart LR
     A["Tu laptop (Docker)"] -->|"git push a tu rama"| B["GitHub: rama feat/..."]
-    B -->|"Pull Request aprobado"| C["GitHub: main"]
-    C -->|"GitHub Actions + AWS OIDC/SSM"| D["AWS EC2: http://3.151.208.72/"]
+    B -->|"Pull Request a main"| C["GitHub: main"]
+    C -->|"CloudShell (proyecto jordanoliber, us-east-2)"| D["AWS EC2: http://3.151.208.72/"]
 ```
 
-1. **Tú (William o Jamiel):**
+1. **Sube tu rama a GitHub:**
 
 ```bash
 git add -A
@@ -144,13 +144,17 @@ git commit -m "feat(pdf): describir brevemente el cambio"
 git push -u origin feat/frente2-ejecutor-pdf   # o feat/frente3-ide-qa
 ```
 
-2. Abre un **Pull Request** hacia `main` en GitHub y avisa por el grupo.
-3. **Despliegue automático:** apenas se hace *merge* a `main`, **GitHub Actions** (`.github/workflows/deploy-ec2.yml`) actualiza la instancia EC2 automáticamente vía AWS SSM (sin SSH ni pasos manuales). En **~30–60 segundos** los cambios se ven en vivo en http://3.151.208.72/.
-4. *(Respaldo manual, solo si alguna vez falla Actions)* Jordan puede forzar la actualización desde AWS CloudShell (`jordanoliber`, `us-east-2`):
+2. Abre un **Pull Request** hacia `main` en GitHub y haz *merge* (previa coordinación en el grupo).
+3. **Publicar en el servidor (cualquier miembro del equipo, sin SSH):**
+   - Acepta la invitación que Jordan envió a tu correo desde **AWS Settings** (https://settings.aws.com/) para el proyecto **`jordanoliber`**.
+   - Abre la **AWS Management Console**, verifica arriba a la derecha la región **`us-east-2` (Ohio)** y pulsa el ícono **`>_` (CloudShell)**.
+   - Pega este único comando:
 
 ```bash
 rm -rf /tmp/latinex && git clone --depth 1 -b main https://github.com/JordanSoncco/latinex.git /tmp/latinex && bash /tmp/latinex/deploy/update-ec2-cloudshell.sh
 ```
+
+En **~30–60 segundos** la instancia EC2 descargará `main`, reconstruirá Docker y verás tus cambios en vivo en http://3.151.208.72/.
 
 ---
 
