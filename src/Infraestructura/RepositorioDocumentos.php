@@ -41,7 +41,7 @@ class RepositorioDocumentos
 
     public static function contenidoInicialBienvenida(string $nombreUsuario): string
     {
-        $autorSeguro = preg_replace('/[#\{\}\\\r\n]+/u', ' ', trim($nombreUsuario)) ?? 'Autor LATINEX';
+        $autorSeguro = str_replace(['#', '{', '}', '\\', "\r", "\n"], ' ', trim($nombreUsuario));
         $autorSeguro = trim(preg_replace('/\s+/u', ' ', $autorSeguro) ?? '');
         if ($autorSeguro === '') {
             $autorSeguro = 'Autor LATINEX';

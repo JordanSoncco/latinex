@@ -14,7 +14,7 @@ const DEFAULT_GUEST_CODE = `// Bienvenido a LATINEX Cloud (Modo Invitado)
 
 #lista(punto) {
     {Curso: #imprimir(curso)}
-    {Compilación en 2 pasadas con referencias cruzadas (#referencia(intro))}
+    {Compilación en 2 pasadas con referencias cruzadas en #referencia(intro)}
     {Entorno web estilo Overleaf en PHP 8.5 + Docker + AWS EC2}
 }
 
@@ -259,40 +259,64 @@ createApp({
 
     const previewData = computed(() => {
       const code = codigoFuente.value;
-      const matchSimple = (cmd) => {
-        const re = new RegExp(`#${cmd}(?:\\([^)]*\\))?\\s*\\{([^}]*)\\}`, 'i');
-        const m = code.match(re);
-        return m ? m[1].replace(/#\w+(?:\([^)]*\))?\s*\{([^}]*)\}/g, '$1').trim() : '';
+      const cleanInline = (raw) => {
+        let s = raw;
+        for (let pass = 0; pass < 4; pass++) {
+          const next = s.replace(/#(?:fuerte|cursiva|subrayado|resaltado|superindice|subindice)(?:\([^)]*\))?\s*\{([^{}]*)\}/gi, '$1');
+          if (next === s) break;
+          s = next;
+        }
+        return s.replace(/\\([#{}])/g, '$1').replace(/\s+/g, ' ').trim();
       };
 
       const bloques = [];
-      const blockRe = /#(seccion|subseccion\d*|texto|caja)(?:\(([^)]*)\))?\s*\{([\s\S]*?)\}/gi;
+      let tituloDoc = '';
+      let autorDoc = '';
+
+      const headRe = /#(titulo|autor|seccion|subseccion\d*|texto|caja)(?:\(([^)]*)\))?\s*\{/gi;
       let match;
-      while ((match = blockRe.exec(code)) !== null) {
+      while ((match = headRe.exec(code)) !== null) {
         const cmd = match[1].toLowerCase();
         const attrs = (match[2] || '').toLowerCase();
-        const cleanBody = match[3]
-          .replace(/#(?:fuerte|cursiva|subrayado|resaltado|superindice|subindice)(?:\([^)]*\))?\s*\{([^}]*)\}/g, '$1')
-          .replace(/\\([#{}])/g, '$1')
-          .replace(/\s+/g, ' ')
-          .trim();
+        const bodyStart = headRe.lastIndex;
+        let depth = 1;
+        let idx = bodyStart;
 
+        while (idx < code.length && depth > 0) {
+          const ch = code[idx];
+          if (ch === '\\') {
+            idx += 2;
+            continue;
+          }
+          if (ch === '{') depth++;
+          else if (ch === '}') depth--;
+          idx++;
+        }
+
+        const bodyEnd = depth === 0 ? idx - 1 : idx;
+        headRe.lastIndex = idx;
+        const cleanBody = cleanInline(code.slice(bodyStart, bodyEnd));
         if (!cleanBody) continue;
-        if (cmd.startsWith('seccion') || cmd.startsWith('subseccion')) {
+
+        if (cmd === 'titulo' && !tituloDoc) {
+          tituloDoc = cleanBody;
+        } else if (cmd === 'autor' && !autorDoc) {
+          autorDoc = cleanBody;
+        } else if (cmd.startsWith('seccion') || cmd.startsWith('subseccion')) {
           bloques.push({ tipo: 'seccion', texto: cleanBody });
         } else if (cmd === 'caja') {
           let estilo = 'info';
           if (attrs.includes('alerta')) estilo = 'alerta';
           else if (attrs.includes('exito') || attrs.includes('éxito')) estilo = 'exito';
           bloques.push({ tipo: 'caja', estilo, texto: cleanBody });
-        } else {
+        } else if (cmd === 'texto') {
           bloques.push({ tipo: 'texto', texto: cleanBody });
         }
       }
 
       return {
-        titulo: matchSimple('titulo') || activeFilename.value,
-        autor: matchSimple('autor'),
+        titulo: tituloDoc || activeFilename.value,
+        autor: autorDoc,
         bloques
       };
     });

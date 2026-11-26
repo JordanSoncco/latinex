@@ -171,13 +171,14 @@ import json, sys
 repo = sys.argv[1]
 cmds = [
     "set -euo pipefail",
+    "export HOME=/root",
     "for i in $(seq 1 60); do [ -f /opt/latinex/.cloud-init-ready ] && break; sleep 5; done",
     "test -f /opt/latinex/.cloud-init-ready",
     "git config --global --add safe.directory /opt/latinex",
-    f"if [ ! -d /opt/latinex/.git ]; then rm -rf /tmp/latinex-repo && git clone --depth 1 {repo} /tmp/latinex-repo && cp -a /tmp/latinex-repo/. /opt/latinex/ && rm -rf /tmp/latinex-repo; else git -C /opt/latinex fetch origin main && git -C /opt/latinex reset --hard origin/main; fi",
+    f"if [ ! -d /opt/latinex/.git ]; then rm -rf /tmp/latinex-repo && git clone --depth 1 -b main {repo} /tmp/latinex-repo && cp -a /tmp/latinex-repo/. /opt/latinex/ && rm -rf /tmp/latinex-repo; else git -C /opt/latinex fetch origin main && git -C /opt/latinex reset --hard origin/main; fi",
     "mkdir -p /opt/latinex/storage/proyectos /opt/latinex/temp_uploads",
     "if [ ! -f /opt/latinex/.env ]; then DB_PASS=$(openssl rand -hex 20); APP_SECRET=$(openssl rand -hex 32); printf 'HTTP_PORT=80\\nAPP_ENV=production\\nAPP_SECRET=%s\\nDB_NAME=latinex\\nDB_USER=latinex\\nDB_PASS=%s\\n' \"$APP_SECRET\" \"$DB_PASS\" > /opt/latinex/.env; chmod 600 /opt/latinex/.env; fi",
-    "cd /opt/latinex && docker compose up -d --build",
+    "cd /opt/latinex && docker build -t latinex-app . && docker compose up -d --no-build",
     "for k in $(seq 1 25); do curl -fsS http://127.0.0.1/auth.php?action=me >/dev/null && break; sleep 3; done",
     "cd /opt/latinex && docker compose ps",
     "cd /opt/latinex && docker compose exec -T app php -v",
