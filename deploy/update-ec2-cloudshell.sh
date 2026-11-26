@@ -10,7 +10,7 @@ if [[ -z "$INSTANCE_ID" || "$INSTANCE_ID" == "None" ]]; then
   exit 1
 fi
 
-SSM_PARAMS='{"commands":["set -euo pipefail","export HOME=/root","cd /opt/latinex","git fetch origin main","git reset --hard origin/main","docker build -t latinex-app . && docker compose up -d --no-build","docker compose ps","curl -fsS http://127.0.0.1/auth.php?action=me"]}'
+SSM_PARAMS='{"commands":["set -euo pipefail","export HOME=/root","cd /opt/latinex","git fetch origin main","git reset --hard origin/main","docker build -t latinex-app . && docker compose up -d --no-build","for k in $(seq 1 15); do curl -fsS http://127.0.0.1/auth.php?action=me >/dev/null && break; sleep 2; done","docker compose ps","curl -fsS http://127.0.0.1/auth.php?action=me"]}'
 CMD_ID="$(aws ssm send-command --region "$REGION" --instance-ids "$INSTANCE_ID" --document-name "AWS-RunShellScript" --parameters "$SSM_PARAMS" --query "Command.CommandId" --output text)"
 
 for _ in $(seq 1 60); do
@@ -22,7 +22,7 @@ for _ in $(seq 1 60); do
     python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("StandardOutputContent",""))' "$INV_JSON"
     exit 0
   elif [[ "$INV_STATUS" == "Failed" || "$INV_STATUS" == "Cancelled" || "$INV_STATUS" == "TimedOut" ]]; then
-    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get("StandardErrorContent",""))' "$INV_JSON" >&2
+    python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get("StandardOutputContent","")); print(d.get("StandardErrorContent",""))' "$INV_JSON" >&2
     exit 1
   fi
 done
