@@ -127,13 +127,13 @@ Las tres deben terminar en **100% APROBADO**. William: agrega también `test_pdf
 
 ---
 
-## 6. Cómo llegan los cambios al servidor (flujo completo)
+## 6. Cómo llegan los cambios al servidor (despliegue automático CI/CD)
 
 ```mermaid
 flowchart LR
     A["Tu laptop (Docker)"] -->|"git push a tu rama"| B["GitHub: rama feat/..."]
-    B -->|"Pull Request revisado"| C["GitHub: main"]
-    C -->|"Jordan ejecuta 1 comando en CloudShell"| D["AWS EC2: http://3.151.208.72/"]
+    B -->|"Pull Request aprobado"| C["GitHub: main"]
+    C -->|"GitHub Actions + AWS OIDC/SSM"| D["AWS EC2: http://3.151.208.72/"]
 ```
 
 1. **Tú (William o Jamiel):**
@@ -145,13 +145,12 @@ git push -u origin feat/frente2-ejecutor-pdf   # o feat/frente3-ide-qa
 ```
 
 2. Abre un **Pull Request** hacia `main` en GitHub y avisa por el grupo.
-3. **Jordan** revisa, integra y publica en el servidor desde AWS CloudShell (proyecto `jordanoliber`, región `us-east-2`):
+3. **Despliegue automático:** apenas se hace *merge* a `main`, **GitHub Actions** (`.github/workflows/deploy-ec2.yml`) actualiza la instancia EC2 automáticamente vía AWS SSM (sin SSH ni pasos manuales). En **~30–60 segundos** los cambios se ven en vivo en http://3.151.208.72/.
+4. *(Respaldo manual, solo si alguna vez falla Actions)* Jordan puede forzar la actualización desde AWS CloudShell (`jordanoliber`, `us-east-2`):
 
 ```bash
 rm -rf /tmp/latinex && git clone --depth 1 -b main https://github.com/JordanSoncco/latinex.git /tmp/latinex && bash /tmp/latinex/deploy/update-ec2-cloudshell.sh
 ```
-
-En unos 30–60 segundos los cambios se ven en http://3.151.208.72/.
 
 ---
 
