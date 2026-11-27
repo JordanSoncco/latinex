@@ -360,7 +360,7 @@ createApp({
 
     const highlightedCode = computed(() => {
       const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const tokenRe = /(\/\/.*$|\\[#{}]|#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![0-9A-Fa-f])|#[a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]+|\b(?:color|tamaño|tamano|fuente|alineacion|ruta|ancho|alto|bordes|fondo|tipo|numerador|denominador|id)\b(?=\s*=)|\b(?:punto|numero|izquierda|centrado|centro|derecha|justificado|verdadero|falso|auto|alerta|info|éxito|exito|rojo|azul|verde|negro|blanco|amarillo|gris)\b|[{}()])/gi;
+      const tokenRe = /(\/\/.*$|\\[#{}]|#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ])|#[a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]+|\b(?:color|tamaño|tamano|fuente|alineacion|ruta|ancho|alto|bordes|fondo|tipo|numerador|denominador|id)\b(?=\s*=)|\b(?:punto|numero|izquierda|centrado|centro|derecha|justificado|verdadero|falso|auto|alerta|info|éxito|exito|rojo|azul|verde|negro|blanco|amarillo|gris)\b|[{}()])/gi;
 
       const lines = codigoFuente.value.split('\n');
       const rendered = lines.map((line) => {
@@ -484,7 +484,7 @@ createApp({
     const lineaActivaHex = computed(() => {
       const lineas = codigoFuente.value.split('\n');
       const actual = lineas[cursorLn.value - 1] || '';
-      const m = actual.match(/#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b/);
+      const m = actual.match(/#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ])/);
       return m ? m[0].toUpperCase() : null;
     });
 
@@ -1062,7 +1062,7 @@ createApp({
         const ventanaInicio = Math.max(0, pos - 12);
         const ventanaFin = Math.min(codigoFuente.value.length, pos + 12);
         const sub = codigoFuente.value.slice(ventanaInicio, ventanaFin);
-        const re = /#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b/g;
+        const re = /#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ])/g;
         let m;
         while ((m = re.exec(sub)) !== null) {
           const absStart = ventanaInicio + m.index;
