@@ -63,19 +63,61 @@ const CASOS_OFICIALES = [
   { key: 'err_1501', label: 'Demo Error Semántico 1501: Ref. inexistente', code: `#texto { Ver la #referencia(etiqueta_perdida). }` }
 ];
 
-const QUICK_SNIPPETS = [
-  { label: '#titulo', desc: 'Insertar título principal', code: `\n#titulo(color=#1A73E8) { Título del Documento }\n` },
-  { label: '#autor', desc: 'Insertar autor', code: `\n#autor { Nombre del Autor }\n` },
-  { label: '#seccion', desc: 'Insertar sección con id', code: `\n#seccion(id=sec1) { Nueva Sección }\n` },
-  { label: '#texto', desc: 'Insertar párrafo justificado', code: `\n#texto(justificado) {\n    Escribe aquí tu párrafo.\n}\n` },
-  { label: '#lista', desc: 'Lista con viñetas', code: `\n#lista(punto) {\n    {Primer elemento}\n    {Segundo elemento}\n}\n` },
-  { label: '#tabla', desc: 'Tabla con bordes y encabezado', code: `\n#tabla(bordes=verdadero) {\n    #fila(fondo=gris) { #celda{Columna 1} #celda{Columna 2} }\n    #fila { #celda{Dato 1} #celda{Dato 2} }\n}\n` },
-  { label: '#fraccion', desc: 'Fracción matemática', code: `#fraccion { {x+1} {y-2} }` },
-  { label: '#ecuacion', desc: 'Ecuación en bloque', code: `\n#ecuacion {\n    #fraccion { {x#superindice{2} + 1} {2} } = 0\n}\n` },
-  { label: '#caja', desc: 'Caja informativa', code: `\n#caja(tipo=info) { Nota importante para el lector. }\n` },
-  { label: '#definir', desc: 'Definir macro', code: `\n#definir(miMacro) { Valor }\n` },
-  { label: '#referencia', desc: 'Referencia cruzada', code: `#referencia(sec1)` },
-  { label: '#indicegeneral', desc: 'Tabla de contenido automática', code: `\n#indicegeneral\n` }
+const QUICK_SNIPPET_GROUPS = [
+  {
+    titulo: 'Estructura',
+    items: [
+      { label: '#titulo', desc: 'Título principal del documento', code: `\n#titulo(color=#1A73E8) { Título del Documento }\n` },
+      { label: '#autor', desc: 'Autor o equipo', code: `\n#autor { Nombre del Autor }\n` },
+      { label: '#fecha', desc: 'Fecha del documento', code: `\n#fecha { Noviembre 2026 }\n` },
+      { label: '#resumen', desc: 'Resumen o abstract', code: `\n#resumen {\n    Síntesis breve del documento.\n}\n` },
+      { label: '#seccion', desc: 'Sección nivel 1 con id', code: `\n#seccion(id=sec1) { Nueva Sección }\n` },
+      { label: '#subseccion', desc: 'Subsección nivel 2', code: `\n#subseccion { Subsección }\n` },
+      { label: '#subseccion2', desc: 'Subsección nivel 3', code: `\n#subseccion2 { Apartado }\n` },
+      { label: '#texto', desc: 'Párrafo justificado', code: `\n#texto(justificado) {\n    Escribe aquí tu párrafo.\n}\n` }
+    ]
+  },
+  {
+    titulo: 'Formato',
+    items: [
+      { label: '#fuerte', desc: 'Texto en negrita', code: `#fuerte{negrita}` },
+      { label: '#cursiva', desc: 'Texto en cursiva', code: `#cursiva{cursiva}` },
+      { label: '#subrayado', desc: 'Texto subrayado', code: `#subrayado{subrayado}` },
+      { label: '#resaltado', desc: 'Texto con fondo resaltado', code: `#resaltado(color=#FFFF00){destacado}` }
+    ]
+  },
+  {
+    titulo: 'Datos y Tablas',
+    items: [
+      { label: '#lista(punto)', desc: 'Lista con viñetas', code: `\n#lista(punto) {\n    {Primer elemento}\n    {Segundo elemento}\n}\n` },
+      { label: '#lista(numero)', desc: 'Lista numerada', code: `\n#lista(numero) {\n    {Paso uno}\n    {Paso dos}\n}\n` },
+      { label: '#tabla', desc: 'Tabla con bordes y encabezado', code: `\n#tabla(bordes=verdadero) {\n    #fila(fondo=gris) { #celda{Columna 1} #celda{Columna 2} }\n    #fila { #celda{Dato 1} #celda{Dato 2} }\n}\n` },
+      { label: '#imagen', desc: 'Insertar imagen JPEG', code: `\n#imagen(ruta=logo.jpg, ancho=50%, alto=auto, alineacion=centro)\n` }
+    ]
+  },
+  {
+    titulo: 'Matemáticas',
+    items: [
+      { label: '#superindice', desc: 'Superíndice (ej. m²)', code: `#superindice{2}` },
+      { label: '#subindice', desc: 'Subíndice (ej. H₂O)', code: `#subindice{2}` },
+      { label: '#fraccion', desc: 'Fracción matemática', code: `#fraccion { {x+1} {y-2} }` },
+      { label: '#ecuacion', desc: 'Ecuación numerada en bloque', code: `\n#ecuacion {\n    #fraccion { {x#superindice{2} + 1} {2} } = 0\n}\n` }
+    ]
+  },
+  {
+    titulo: 'Control, Cajas y Macros',
+    items: [
+      { label: '#caja(info)', desc: 'Caja informativa', code: `\n#caja(tipo=info) { Nota informativa para el lector. }\n` },
+      { label: '#caja(alerta)', desc: 'Caja de advertencia', code: `\n#caja(tipo=alerta) { Advertencia importante. }\n` },
+      { label: '#caja(exito)', desc: 'Caja de confirmación', code: `\n#caja(tipo=exito) { Validación completada correctamente. }\n` },
+      { label: '#salto', desc: 'Salto de línea explícito', code: ` #salto ` },
+      { label: '#nuevapagina', desc: 'Salto de página explícito', code: `\n#nuevapagina\n` },
+      { label: '#definir', desc: 'Definir macro', code: `\n#definir(miMacro) { Valor }\n` },
+      { label: '#imprimir', desc: 'Invocar macro', code: `#imprimir(miMacro)` },
+      { label: '#referencia', desc: 'Referencia cruzada a sección', code: `#referencia(sec1)` },
+      { label: '#indicegeneral', desc: 'Índice automático', code: `\n#indicegeneral\n` }
+    ]
+  }
 ];
 
 const PRESET_COLORS = [
@@ -190,7 +232,7 @@ function installLightDismissFallback(dialogEl) {
 createApp({
   setup() {
     const sidebarOpen = ref(true);
-    const ribbonOpen = ref(true);
+    const snippetsPopoverRef = ref(null);
     const inspectorOpen = ref(false);
     const activeTab = ref('lexico');
     const showLexicalRef = ref(false);
@@ -229,6 +271,7 @@ createApp({
     const syncHighlightLine = ref(0);
     const editorRef = ref(null);
     const gutterRef = ref(null);
+    const highlightRef = ref(null);
 
     // ── Estado Visor PDF.js + SyncTeX ──
     const previewStageRef = ref(null);
@@ -237,12 +280,12 @@ createApp({
     const currentPage = ref(1);
     const pdfZoom = ref(1.0);
     const activeSyncHit = ref(null);
-    const selectedPdfHit = ref(null);
     const pdfCanvasMap = new Map();
     let pdfDocInstance = null;
     let activeCompileAbort = null;
     let renderTokenCounter = 0;
     let syncFlashTimer = null;
+    let pdfSyncFlashTimer = null;
 
     // ── Estado Rueda Cromática HSV (#HEX) ──
     const colorPopoverRef = ref(null);
@@ -300,6 +343,55 @@ createApp({
 
     const totalLineas = computed(() => Math.max(1, codigoFuente.value.split('\n').length));
     const codigoBytes = computed(() => new TextEncoder().encode(codigoFuente.value).length);
+
+    // Resaltado de sintaxis LATINEX en tiempo real estilo Overleaf (single-pass seguro)
+    const CMD_CLASS_MAP = {
+      titulo: 'hl-cmd-struct', autor: 'hl-cmd-struct', fecha: 'hl-cmd-struct', resumen: 'hl-cmd-struct',
+      seccion: 'hl-cmd-struct', subseccion: 'hl-cmd-struct', subseccion2: 'hl-cmd-struct',
+      subseccion3: 'hl-cmd-struct', subseccion4: 'hl-cmd-struct', texto: 'hl-cmd-struct', indicegeneral: 'hl-cmd-struct',
+      fuerte: 'hl-cmd-fmt', cursiva: 'hl-cmd-fmt', subrayado: 'hl-cmd-fmt', resaltado: 'hl-cmd-fmt',
+      lista: 'hl-cmd-data', imagen: 'hl-cmd-data', tabla: 'hl-cmd-data', fila: 'hl-cmd-data', celda: 'hl-cmd-data', caja: 'hl-cmd-data',
+      superindice: 'hl-cmd-math', subindice: 'hl-cmd-math', fraccion: 'hl-cmd-math', ecuacion: 'hl-cmd-math',
+      salto: 'hl-cmd-ctrl', nuevapagina: 'hl-cmd-ctrl', definir: 'hl-cmd-ctrl', imprimir: 'hl-cmd-ctrl', referencia: 'hl-cmd-ctrl'
+    };
+
+    const highlightedCode = computed(() => {
+      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const tokenRe = /(\/\/.*$|\\[#{}]|#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![0-9A-Fa-f])|#[a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]+|\b(?:color|tamaño|tamano|fuente|alineacion|ruta|ancho|alto|bordes|fondo|tipo|numerador|denominador|id)\b(?=\s*=)|\b(?:punto|numero|izquierda|centrado|centro|derecha|justificado|verdadero|falso|auto|alerta|info|éxito|exito|rojo|azul|verde|negro|blanco|amarillo|gris)\b|[{}()])/gi;
+
+      const lines = codigoFuente.value.split('\n');
+      const rendered = lines.map((line) => {
+        let out = '';
+        let last = 0;
+        tokenRe.lastIndex = 0;
+        let m;
+        while ((m = tokenRe.exec(line)) !== null) {
+          if (m.index > last) out += esc(line.slice(last, m.index));
+          const tok = m[0];
+          if (tok.startsWith('//')) {
+            out += `<span class="hl-comment">${esc(tok)}</span>`;
+          } else if (tok.startsWith('\\')) {
+            out += `<span class="hl-escape">${esc(tok)}</span>`;
+          } else if (/^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/.test(tok)) {
+            out += `<span class="hl-hex" style="border-bottom: 2px solid ${tok};">${esc(tok)}</span>`;
+          } else if (tok.startsWith('#')) {
+            const cmdCls = CMD_CLASS_MAP[tok.slice(1).toLowerCase()];
+            out += cmdCls ? `<span class="${cmdCls}">${esc(tok)}</span>` : esc(tok);
+          } else if (tok === '{' || tok === '}' || tok === '(' || tok === ')') {
+            out += `<span class="hl-punct">${tok}</span>`;
+          } else if (/^(?:color|tamaño|tamano|fuente|alineacion|ruta|ancho|alto|bordes|fondo|tipo|numerador|denominador|id)$/i.test(tok)) {
+            out += `<span class="hl-attr">${esc(tok)}</span>`;
+          } else {
+            out += `<span class="hl-val">${esc(tok)}</span>`;
+          }
+          last = m.index + tok.length;
+        }
+        if (last < line.length) out += esc(line.slice(last));
+        return out;
+      });
+
+      return rendered.join('\n') + (codigoFuente.value.endsWith('\n') ? ' ' : '');
+    });
 
     const activeFilename = computed(() => {
       if (user.value && activeDoc.value) return activeDoc.value.nombre_archivo;
@@ -428,45 +520,86 @@ createApp({
       });
     });
 
-    // Mapa de regiones clicables SyncTeX sobre cada hoja A4 (595 x 842 pt)
+    // Mapa de regiones clicables SyncTeX sin sobreposición sobre cada hoja A4 (595 x 842 pt)
     const syncHitsAll = computed(() => {
       const elems = compileResult.value?.ejecucion?.figurasOElementos || [];
-      const hits = [];
+      const rawHits = [];
+
       elems.forEach((el, idx) => {
         const linea = Number(el.linea || 0);
         if (el.tipo === 'text' && el.texto && el.texto.trim()) {
           const size = Number(el.tamano || 12);
-          const x = Number(el.x || 50);
+          const xPt = Number(el.x || 50);
           const yBase = Number(el.yLogica || 60);
-          const topPt = Math.max(0, yBase - size * 0.9);
-          const heightPt = Math.max(12, size * 1.28);
-          const estWidth = Math.min(595 - x - 16, Math.max(24, el.texto.length * size * 0.52));
-          hits.push({
+          const topPt = Math.max(0, yBase - size * 0.88);
+          const heightPt = Math.max(10, size * 1.22);
+          const rawWidth = Number(el.ancho || 0) > 0
+            ? Number(el.ancho)
+            : Math.max(12, el.texto.length * size * 0.48);
+          const widthPt = Math.min(595 - xPt - 10, Math.max(8, rawWidth));
+
+          rawHits.push({
             id: `hit-${idx}`,
+            kind: 'text',
             pagina: Number(el.pagina || 1),
-            leftPct: (x / 595) * 100,
-            topPct: (topPt / 842) * 100,
-            widthPct: (estWidth / 595) * 100,
-            heightPct: (heightPt / 842) * 100,
+            xPt,
+            topPt,
+            widthPt,
+            heightPt,
             yLogica: yBase,
             texto: el.texto.trim(),
             linea: linea > 0 ? linea : inferirLineaPorTexto(el.texto)
           });
         } else if (el.tipo === 'image') {
-          hits.push({
+          rawHits.push({
             id: `hit-${idx}`,
+            kind: 'image',
             pagina: Number(el.pagina || 1),
-            leftPct: (Number(el.x || 50) / 595) * 100,
-            topPct: (Number(el.yLogica || 50) / 842) * 100,
-            widthPct: (Number(el.ancho || 120) / 595) * 100,
-            heightPct: (Number(el.alto || 80) / 842) * 100,
+            xPt: Number(el.x || 50),
+            topPt: Number(el.yLogica || 50),
+            widthPt: Number(el.ancho || 120),
+            heightPt: Number(el.alto || 80),
             yLogica: Number(el.yLogica || 50),
             texto: `#imagen(${el.nombre || 'jpg'})`,
             linea: linea > 0 ? linea : inferirLineaPorTexto(el.nombre || '#imagen')
           });
         }
       });
-      return hits;
+
+      // Evitar cualquier sobreposición entre fragmentos contiguos en la misma línea base
+      const textHits = rawHits.filter((h) => h.kind === 'text');
+      const byPage = new Map();
+      for (const h of textHits) {
+        if (!byPage.has(h.pagina)) byPage.set(h.pagina, []);
+        byPage.get(h.pagina).push(h);
+      }
+
+      for (const list of byPage.values()) {
+        list.sort((a, b) => (a.yLogica - b.yLogica) || (a.xPt - b.xPt));
+        for (let i = 0; i < list.length; i++) {
+          const cur = list[i];
+          for (let j = i + 1; j < list.length; j++) {
+            const nxt = list[j];
+            if (Math.abs(nxt.yLogica - cur.yLogica) >= 4.0) break;
+            if (nxt.xPt > cur.xPt) {
+              cur.widthPt = Math.max(4, Math.min(cur.widthPt, nxt.xPt - cur.xPt - 0.5));
+              break;
+            }
+          }
+        }
+      }
+
+      return rawHits.map((h) => ({
+        id: h.id,
+        pagina: h.pagina,
+        leftPct: (h.xPt / 595) * 100,
+        topPct: (h.topPt / 842) * 100,
+        widthPct: (h.widthPt / 595) * 100,
+        heightPct: (h.heightPt / 842) * 100,
+        yLogica: h.yLogica,
+        texto: h.texto,
+        linea: h.linea
+      }));
     });
 
     function inferirLineaPorTexto(fragmento) {
@@ -995,6 +1128,9 @@ createApp({
     };
 
     const insertarSnippet = async (snippet) => {
+      if (snippetsPopoverRef.value?.matches?.(':popover-open')) {
+        snippetsPopoverRef.value.hidePopover();
+      }
       const ta = editorRef.value;
       const start = ta?.selectionStart ?? codigoFuente.value.length;
       const end = ta?.selectionEnd ?? start;
@@ -1122,28 +1258,31 @@ createApp({
       currentPage.value = mejorPag;
     };
 
-    // ── Sincronización Bidireccional SyncTeX (Overleaf ↔ Código) ────
+    // ── Sincronización Bidireccional SyncTeX (Discreta estilo Overleaf) ─
     const destellarLineaEditor = (linea) => {
       syncHighlightLine.value = linea;
       if (syncFlashTimer) clearTimeout(syncFlashTimer);
       syncFlashTimer = setTimeout(() => {
         syncHighlightLine.value = 0;
-      }, 1800);
+      }, 1500);
     };
 
-    const alClicElementoPdf = (hit) => {
-      selectedPdfHit.value = hit;
+    const dispararPulsoPdf = (hit) => {
+      activeSyncHit.value = null;
+      nextTick(() => {
+        activeSyncHit.value = hit;
+        if (pdfSyncFlashTimer) clearTimeout(pdfSyncFlashTimer);
+        pdfSyncFlashTimer = setTimeout(() => {
+          activeSyncHit.value = null;
+        }, 1100);
+      });
     };
 
     const alDobleClicElementoPdf = (hit) => {
-      selectedPdfHit.value = hit;
-      irACodigoDesdeHit(hit);
-    };
-
-    const irACodigoDesdeHit = (hit) => {
-      if (!hit || hit.linea <= 0) return;
-      activeSyncHit.value = hit;
-      irALinea(hit.linea, true);
+      const palabraSel = (window.getSelection()?.toString() || '').trim();
+      window.getSelection()?.removeAllRanges();
+      dispararPulsoPdf(hit);
+      irALineaConTexto(hit.linea, palabraSel || hit.texto);
     };
 
     const sincronizarEditorAPdf = () => {
@@ -1158,8 +1297,7 @@ createApp({
           mejor = h;
         }
       }
-      activeSyncHit.value = mejor;
-      selectedPdfHit.value = mejor;
+      dispararPulsoPdf(mejor);
       currentPage.value = mejor.pagina;
 
       const stage = previewStageRef.value;
@@ -1175,13 +1313,10 @@ createApp({
     };
 
     const sincronizarPdfAEditorBoton = () => {
-      if (selectedPdfHit.value) {
-        irACodigoDesdeHit(selectedPdfHit.value);
-        return;
-      }
       const hitsPag = elementosPorPagina(currentPage.value);
       if (hitsPag.length > 0) {
-        irACodigoDesdeHit(hitsPag[0]);
+        dispararPulsoPdf(hitsPag[0]);
+        irALineaConTexto(hitsPag[0].linea, hitsPag[0].texto);
       }
     };
 
@@ -1254,7 +1389,6 @@ createApp({
       codigoFuente.value = detalle.documento.contenido_ltx;
       reiniciarHistorial(detalle.documento.contenido_ltx);
       saveState.value = 'saved';
-      selectedPdfHit.value = null;
       await compilar();
     };
 
@@ -1399,7 +1533,6 @@ createApp({
     const cargarCasoSeleccionado = async () => {
       const encontrado = CASOS_OFICIALES.find((c) => c.key === selectedCaseKey.value);
       if (!encontrado) return;
-      selectedPdfHit.value = null;
       await aplicarCambioTransaccional(encontrado.code, 0, 0);
       await compilar();
     };
@@ -1414,8 +1547,13 @@ createApp({
     };
 
     const sincronizarScroll = () => {
-      if (gutterRef.value && editorRef.value) {
+      if (!editorRef.value) return;
+      if (gutterRef.value) {
         gutterRef.value.scrollTop = editorRef.value.scrollTop;
+      }
+      if (highlightRef.value) {
+        highlightRef.value.scrollTop = editorRef.value.scrollTop;
+        highlightRef.value.scrollLeft = editorRef.value.scrollLeft;
       }
     };
 
@@ -1434,6 +1572,71 @@ createApp({
       sincronizarScroll();
       actualizarPosicionCursor();
       if (conDestello) destellarLineaEditor(lineaObjetivo);
+    };
+
+    const irALineaConTexto = async (lineaObjetivo, textoBuscado = '') => {
+      const ta = editorRef.value;
+      if (!ta || lineaObjetivo <= 0) return;
+      const lineas = codigoFuente.value.split('\n');
+      const needle = (textoBuscado || '').trim();
+
+      let targetLineIdx = Math.min(lineaObjetivo - 1, lineas.length - 1);
+      let selStart = -1;
+      let selEnd = -1;
+
+      const buscarEnLinea = (idx, q) => {
+        if (idx < 0 || idx >= lineas.length || !q) return -1;
+        const posExacta = lineas[idx].indexOf(q);
+        if (posExacta >= 0) return posExacta;
+        return lineas[idx].toLowerCase().indexOf(q.toLowerCase());
+      };
+
+      const candidatos = [targetLineIdx, targetLineIdx + 1, targetLineIdx - 1];
+      if (needle.length >= 2) {
+        for (const cIdx of candidatos) {
+          const found = buscarEnLinea(cIdx, needle);
+          if (found >= 0) {
+            targetLineIdx = cIdx;
+            selStart = found;
+            selEnd = found + needle.length;
+            break;
+          }
+        }
+        if (selStart < 0) {
+          const palabras = needle
+            .split(/\s+/)
+            .filter((w) => w.length >= 3)
+            .sort((a, b) => b.length - a.length);
+          for (const pal of palabras) {
+            for (const cIdx of candidatos) {
+              const found = buscarEnLinea(cIdx, pal);
+              if (found >= 0) {
+                targetLineIdx = cIdx;
+                selStart = found;
+                selEnd = found + pal.length;
+                break;
+              }
+            }
+            if (selStart >= 0) break;
+          }
+        }
+      }
+
+      let lineOffset = 0;
+      for (let i = 0; i < targetLineIdx; i++) {
+        lineOffset += lineas[i].length + 1;
+      }
+
+      const finalStart = selStart >= 0 ? lineOffset + selStart : lineOffset;
+      const finalEnd = selEnd >= 0 ? lineOffset + selEnd : lineOffset + (lineas[targetLineIdx]?.length || 0);
+
+      await nextTick();
+      ta.focus();
+      ta.setSelectionRange(finalStart, finalEnd);
+      ta.scrollTop = Math.max(0, (targetLineIdx - 3) * 20);
+      sincronizarScroll();
+      actualizarPosicionCursor();
+      destellarLineaEditor(targetLineIdx + 1);
     };
 
     const manejarAtajosEditor = (e) => {
@@ -1697,12 +1900,13 @@ createApp({
       if (autosaveTimer) clearTimeout(autosaveTimer);
       if (typingHistoryTimer) clearTimeout(typingHistoryTimer);
       if (syncFlashTimer) clearTimeout(syncFlashTimer);
+      if (pdfSyncFlashTimer) clearTimeout(pdfSyncFlashTimer);
       if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value);
     });
 
     return {
       sidebarOpen,
-      ribbonOpen,
+      snippetsPopoverRef,
       inspectorOpen,
       activeTab,
       showLexicalRef,
@@ -1720,6 +1924,7 @@ createApp({
       activeImages,
       activeFilename,
       codigoFuente,
+      highlightedCode,
       totalLineas,
       codigoBytes,
       cursorLn,
@@ -1728,6 +1933,7 @@ createApp({
       lineaActivaHex,
       editorRef,
       gutterRef,
+      highlightRef,
       canUndo,
       canRedo,
       undoCount,
@@ -1736,7 +1942,7 @@ createApp({
       envolverFormato,
       selectedCaseKey,
       casosDePrueba: CASOS_OFICIALES,
-      quickSnippets: QUICK_SNIPPETS,
+      quickSnippetGroups: QUICK_SNIPPET_GROUPS,
       presetColors: PRESET_COLORS,
       documentOutline,
       saltarAEsquema,
@@ -1776,10 +1982,7 @@ createApp({
       elementosPorPagina,
       estiloCajaSync,
       activeSyncHit,
-      selectedPdfHit,
-      alClicElementoPdf,
       alDobleClicElementoPdf,
-      irACodigoDesdeHit,
       sincronizarEditorAPdf,
       sincronizarPdfAEditorBoton,
       tokensAnalizados,

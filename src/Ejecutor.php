@@ -2342,12 +2342,24 @@ class Ejecutor
         }
         $yPdf = (self::ALTO_PAGINA - $yBaselineLogica) + $rise;
 
+        $estiloMedida = [
+            'family' => $fuentePdf === '/F5' ? 'Courier' : ($fuentePdf === '/F6' ? 'Times' : 'Helvetica'),
+            'bold'   => in_array($fuentePdf, ['/F2', '/F4'], true),
+            'italic' => in_array($fuentePdf, ['/F3', '/F4'], true),
+            'size'   => $tamano,
+        ];
+        $anchoPt = $this->MedirAnchoTexto($texto, $estiloMedida);
+        if ($tw > 0.0) {
+            $anchoPt += substr_count($texto, ' ') * $tw;
+        }
+
         $this->elementos[] = [
             'tipo'    => 'text',
             'pagina'  => $pagina,
             'x'       => round($x, 2),
             'yLogica' => round($yBaselineLogica, 2),
             'yPdf'    => round($yPdf, 2),
+            'ancho'   => round($anchoPt, 2),
             'fuente'  => $fuentePdf,
             'tamano'  => round($tamano, 2),
             'color'   => $color,

@@ -319,28 +319,46 @@
 
           <div class="toolbar-group">
             <button
+              id="snippetsTrigger"
               type="button"
               class="tool-btn snippet-toggle-btn"
-              :class="{ active: ribbonOpen }"
-              @click="ribbonOpen = !ribbonOpen"
-              title="Mostrar u ocultar barra de etiquetas rápidas">
-              Etiquetas {{ ribbonOpen ? '▴' : '▾' }}
+              popovertarget="snippetsPopover"
+              title="Insertar cualquier etiqueta o comando LATINEX">
+              + Etiquetas ▾
             </button>
           </div>
         </div>
 
-        <!-- Cinta compacta de etiquetas rápidas (respeta Undo/Redo al 100%) -->
-        <nav v-show="ribbonOpen" class="snippet-ribbon" aria-label="Inserción rápida de comandos LATINEX">
-          <button
-            v-for="item in quickSnippets"
-            :key="item.label"
-            type="button"
-            class="snippet-btn"
-            :title="item.desc"
-            @click="insertarSnippet(item.code)">
-            {{ item.label }}
-          </button>
-        </nav>
+        <!-- Catálogo flotante discreto de todas las etiquetas (no distorsiona el editor) -->
+        <div ref="snippetsPopoverRef" id="snippetsPopover" popover="auto" class="snippets-popover">
+          <div class="snippets-popover-header">
+            <strong>Catálogo de Etiquetas LATINEX</strong>
+            <button
+              type="button"
+              class="mini-action-btn"
+              popovertarget="snippetsPopover"
+              popovertargetaction="hide"
+              title="Cerrar catálogo">
+              ✕
+            </button>
+          </div>
+          <div class="snippets-groups">
+            <div v-for="grupo in quickSnippetGroups" :key="grupo.titulo" class="snippet-group">
+              <span class="snippet-group-title">{{ grupo.titulo }}</span>
+              <div class="snippet-group-grid">
+                <button
+                  v-for="item in grupo.items"
+                  :key="item.label"
+                  type="button"
+                  class="snippet-chip"
+                  :title="item.desc"
+                  @click="insertarSnippet(item.code)">
+                  {{ item.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- Lienzo del editor con marca de agua estilo Overleaf -->
         <div class="editor-shell">
@@ -364,17 +382,20 @@
               'active-line': cursorLn === n && errorLine !== n && syncHighlightLine !== n
             }">{{ n }}</span></pre>
 
-          <textarea
-            ref="editorRef"
-            class="code-textarea"
-            v-model="codigoFuente"
-            spellcheck="false"
-            aria-label="Código fuente LATINEX"
-            @input="alEditarCodigo"
-            @scroll="sincronizarScroll"
-            @click="actualizarPosicionCursor"
-            @keyup="actualizarPosicionCursor"
-            @keydown="manejarAtajosEditor"></textarea>
+          <div class="code-stage">
+            <pre ref="highlightRef" class="code-highlight" aria-hidden="true" v-html="highlightedCode"></pre>
+            <textarea
+              ref="editorRef"
+              class="code-textarea"
+              v-model="codigoFuente"
+              spellcheck="false"
+              aria-label="Código fuente LATINEX"
+              @input="alEditarCodigo"
+              @scroll="sincronizarScroll"
+              @click="actualizarPosicionCursor"
+              @keyup="actualizarPosicionCursor"
+              @keydown="manejarAtajosEditor"></textarea>
+          </div>
         </div>
 
         <div class="editor-footer">
@@ -478,20 +499,6 @@
           <div class="compile-progress-bar"></div>
         </div>
 
-        <!-- Píldora interactiva cuando seleccionas o haces clic en una palabra de la vista previa -->
-        <div v-if="selectedPdfHit && !errorPanel" class="synctex-banner">
-          <div class="synctex-banner-info">
-            <span class="synctex-badge">Línea {{ selectedPdfHit.linea }}</span>
-            <span class="synctex-snippet">“{{ selectedPdfHit.texto }}”</span>
-          </div>
-          <div class="synctex-banner-actions">
-            <button type="button" class="btn btn-sm" @click="irACodigoDesdeHit(selectedPdfHit)">
-              ← Ver código que lo generó
-            </button>
-            <button type="button" class="mini-action-btn" @click="selectedPdfHit = null" title="Cerrar aviso">✕</button>
-          </div>
-        </div>
-
         <div ref="previewStageRef" class="preview-stage" @scroll="alHacerScrollPdf">
           <div v-if="errorPanel" class="error-card" role="alert">
             <h2>⚠ {{ errorPanel.titulo }}</h2>
@@ -504,7 +511,7 @@
             </div>
           </div>
 
-          <!-- Hojas A4 renderizadas en <canvas> de solo lectura + Capa SyncTeX -->
+          <!-- Hojas A4 renderizadas en <canvas> de solo lectura + Capa SyncTeX discreta -->
           <div
             v-else-if="pdfPagesCount > 0 && !pdfjsFallback"
             class="pdf-pages-stack"
@@ -519,19 +526,14 @@
                 :ref="(el) => setPdfCanvasRef(pageNum, el)"
                 class="pdf-page-canvas"></canvas>
 
-              <!-- Capa interactiva SyncTeX de solo lectura: clic o selección vincula al código .ltx -->
-              <div class="pdf-synctex-layer" title="Selecciona o haz doble clic sobre cualquier elemento para ir a su código .ltx">
+              <!-- Capa SyncTeX invisible y discreta: doble clic sincroniza palabra y línea -->
+              <div class="pdf-synctex-layer">
                 <div
                   v-for="(hit, hIdx) in elementosPorPagina(pageNum)"
                   :key="hIdx"
                   class="synctex-hit"
-                  :class="{
-                    'active-sync': activeSyncHit && activeSyncHit.id === hit.id,
-                    'selected-sync': selectedPdfHit && selectedPdfHit.id === hit.id
-                  }"
+                  :class="{ 'sync-flash': activeSyncHit && activeSyncHit.id === hit.id }"
                   :style="estiloCajaSync(hit)"
-                  :title="`Línea ${hit.linea} · Doble clic para ir al código`"
-                  @click.stop="alClicElementoPdf(hit)"
                   @dblclick.stop="alDobleClicElementoPdf(hit)">
                   <span class="synctex-selectable">{{ hit.texto }}</span>
                 </div>
