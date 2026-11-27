@@ -38,6 +38,7 @@ services:
       - ./public:/var/www/html/public:ro
       - ./test_lexico.php:/var/www/html/test_lexico.php:ro
       - ./test_frente1.php:/var/www/html/test_frente1.php:ro
+      - ./test_pdf.php:/var/www/html/test_pdf.php:ro
       - ./test_auth_proyectos.php:/var/www/html/test_auth_proyectos.php:ro
       - ./demo_compilador.php:/var/www/html/demo_compilador.php:ro
       - storage_data:/var/www/html/storage

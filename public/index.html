@@ -473,7 +473,7 @@
           <div class="inspector-toolbar">
             <span>Motor Two-Pass A4 y PDF Binario · Estado: {{ compileResult?.ejecucion?.estado || 'SIN EJECUTAR' }}</span>
           </div>
-          <pre style="margin: 0; font-family: 'Fira Code', monospace; font-size: 0.76rem; color: #cbd5e1;">{{ JSON.stringify(compileResult?.ejecucion || {}, null, 2) }}</pre>
+          <pre style="margin: 0; font-family: 'Fira Code', monospace; font-size: 0.76rem; color: #cbd5e1;">{{ JSON.stringify(ejecucionInspector, null, 2) }}</pre>
         </div>
       </div>
     </section>

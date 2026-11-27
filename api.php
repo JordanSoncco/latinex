@@ -248,12 +248,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     $mensajeFinal  = $ejecutor->getError()['mensaje'] ?? 'Error durante la ejecución.';
                 } else {
                     $estadoGeneral = 'exito';
-                    $mensajeFinal  = sprintf(
-                        'Análisis Léxico, Sintáctico y Semántico ACEPTADOS (%d tokens, %d transiciones, %d símbolos).',
-                        $totalTokens,
-                        count($sintacticoData['transiciones']),
-                        count($semanticoData['tablaSimbolos'])
-                    );
+                    if ($pdfImplementado && $pdfBase64 !== null) {
+                        $pdfStats     = $pdfGen->getStats();
+                        $mensajeFinal = sprintf(
+                            '4 Fases ACEPTADAS (%d tokens, %d transiciones, %d símbolos, PDF %d pág. / %d B).',
+                            $totalTokens,
+                            count($sintacticoData['transiciones']),
+                            count($semanticoData['tablaSimbolos']),
+                            (int) ($pdfStats['paginas'] ?? 0),
+                            (int) ($pdfStats['bytes'] ?? 0)
+                        );
+                    } else {
+                        $mensajeFinal = sprintf(
+                            'Análisis Léxico, Sintáctico y Semántico ACEPTADOS (%d tokens, %d transiciones, %d símbolos).',
+                            $totalTokens,
+                            count($sintacticoData['transiciones']),
+                            count($semanticoData['tablaSimbolos'])
+                        );
+                    }
                 }
             }
         }

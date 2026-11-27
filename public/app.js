@@ -199,6 +199,17 @@ createApp({
 
     const pdfDownloadBase64 = computed(() => compileResult.value?.ejecucion?.pdfBase64 || null);
 
+    const ejecucionInspector = computed(() => {
+      const ej = compileResult.value?.ejecucion;
+      if (!ej) return {};
+      if (!ej.pdfBase64) return ej;
+      const bytes = ej.pdfStats?.bytes || Math.floor((ej.pdfBase64.length * 3) / 4);
+      return {
+        ...ej,
+        pdfBase64: `[Binario %PDF-1.4 omitido en inspector — ${(bytes / 1024).toFixed(2)} KB, listo para visor y descarga]`
+      };
+    });
+
     const errorPanel = computed(() => {
       const res = compileResult.value;
       if (!res) return null;
@@ -254,6 +265,7 @@ createApp({
       if (isCompiling.value) return 'Compilando...';
       if (!compileResult.value) return 'Sin compilar';
       if (errorPanel.value) return errorPanel.value.titulo;
+      if (compileResult.value.ejecucion?.implementado) return '4 Fases ACEPTADAS · PDF listo';
       return 'Fases 1–3 ACEPTADAS';
     });
 
@@ -859,6 +871,7 @@ createApp({
       compileResult,
       pdfUrl,
       pdfDownloadBase64,
+      ejecucionInspector,
       tokensAnalizados,
       sintacticoPasos,
       tablaSimbolos,
