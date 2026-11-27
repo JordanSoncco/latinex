@@ -186,14 +186,15 @@
           <!-- Imágenes adjuntas -->
           <section class="sidebar-section">
             <div class="sidebar-header">
-              <h2 class="sidebar-title">Recursos (.jpg)</h2>
-              <span v-if="user && activeDoc" class="save-pill guest">{{ activeImages.length }}/5</span>
+              <h2 class="sidebar-title">Imágenes (.jpg, .jpeg)</h2>
+              <span class="save-pill guest">{{ (user && activeDoc ? activeImages.length : guestImages.length) }}/5</span>
             </div>
 
             <label class="image-upload-label">
-              <span>{{ user && activeDoc ? '+ Subir .jpg al proyecto' : '+ Adjuntar .jpg local' }}</span>
+              <span>{{ user && activeDoc ? '+ Subir imagen (.jpg, .jpeg)' : '+ Adjuntar (.jpg, .jpeg)' }}</span>
               <input type="file" accept=".jpg,.jpeg,image/jpeg" :multiple="!user" @change="subirImagen">
             </label>
+            <p class="asset-hint">Admitidos: <code>.jpg</code>, <code>.jpeg</code> · Máx. 2 MB</p>
 
             <div v-if="user && activeDoc" class="asset-list">
               <div v-for="img in activeImages" :key="img.id" class="asset-row">
@@ -202,7 +203,12 @@
                   class="asset-insert-btn"
                   title="Insertar #imagen(...) en el cursor"
                   @click="insertarSnippet(`\n#imagen(ruta=${img.nombre_archivo}, ancho=60%, alto=auto, alineacion=centro)\n`)">
-                  🖼 {{ img.nombre_archivo }}
+                  <svg class="asset-svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2"/>
+                    <circle cx="8.5" cy="9.5" r="1.5"/>
+                    <path d="M21 15l-5-5L5 20"/>
+                  </svg>
+                  <span class="asset-name-text">{{ img.nombre_archivo }}</span>
                 </button>
                 <button
                   type="button"
@@ -219,10 +225,16 @@
                 <button
                   type="button"
                   class="asset-insert-btn"
+                  title="Insertar #imagen(...) en el cursor"
                   @click="insertarSnippet(`\n#imagen(ruta=${img.name}, ancho=60%, alto=auto, alineacion=centro)\n`)">
-                  🖼 {{ img.name }}
+                  <svg class="asset-svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2"/>
+                    <circle cx="8.5" cy="9.5" r="1.5"/>
+                    <path d="M21 15l-5-5L5 20"/>
+                  </svg>
+                  <span class="asset-name-text">{{ img.name }}</span>
                 </button>
-                <button type="button" class="mini-action-btn danger" @click="guestImages.splice(idx, 1)">✕</button>
+                <button type="button" class="mini-action-btn danger" title="Quitar imagen" @click="guestImages.splice(idx, 1)">✕</button>
               </div>
             </div>
           </section>
@@ -395,6 +407,46 @@
               @click="actualizarPosicionCursor"
               @keyup="actualizarPosicionCursor"
               @keydown="manejarAtajosEditor"></textarea>
+
+            <!-- Autocompletado discreto estilo Overleaf al escribir #imagen(ruta=...) -->
+            <div
+              v-if="imageRouteAutocomplete.open"
+              class="editor-autocomplete-bar"
+              role="listbox"
+              aria-label="Imágenes disponibles para ruta=">
+              <div class="autocomplete-head">
+                <span>Imágenes disponibles (<code>ruta=</code>)</span>
+                <span class="autocomplete-kbd">↑↓ · Enter / Tab · Esc</span>
+              </div>
+
+              <div v-if="imageRouteAutocomplete.matches.length > 0" class="autocomplete-list">
+                <button
+                  v-for="(imgName, idx) in imageRouteAutocomplete.matches"
+                  :key="imgName"
+                  type="button"
+                  role="option"
+                  :aria-selected="idx === imgSuggestIndex"
+                  class="autocomplete-item"
+                  :class="{ active: idx === imgSuggestIndex }"
+                  @mousedown.prevent="aplicarSugerenciaImagen(imgName)">
+                  <svg class="asset-svg-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2"/>
+                    <circle cx="8.5" cy="9.5" r="1.5"/>
+                    <path d="M21 15l-5-5L5 20"/>
+                  </svg>
+                  <span class="autocomplete-name">{{ imgName }}</span>
+                  <span class="autocomplete-badge">JPEG</span>
+                </button>
+              </div>
+
+              <div v-else class="autocomplete-empty">
+                <span>{{ availableImageNames.length === 0 ? 'No has subido imágenes (.jpg, .jpeg) aún.' : 'Ninguna imagen coincide con esa ruta.' }}</span>
+                <label v-if="availableImageNames.length === 0" class="autocomplete-upload-btn" @mousedown.stop>
+                  <span>+ Subir (.jpg, .jpeg)</span>
+                  <input type="file" accept=".jpg,.jpeg,image/jpeg" @change="subirImagenYCompletarRuta">
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 

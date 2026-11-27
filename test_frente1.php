@@ -33,7 +33,7 @@ use const Latinex\T_FIN;
 
 $tablaLexica = new TablaLexica();
 
-function EjecutarPipelineFrente1(string $codigo, TablaLexica $tablaLexica): array
+function EjecutarPipelineFrente1(string $codigo, TablaLexica $tablaLexica, ?string $assetsDir = null): array
 {
     // 1. Léxico
     $tok = new Tokenizador($codigo, $tablaLexica);
@@ -55,7 +55,7 @@ function EjecutarPipelineFrente1(string $codigo, TablaLexica $tablaLexica): arra
     }
 
     // 3. Semántico
-    $semantico = new AnalizadorSemantico(new Tokenizador($codigo, $tablaLexica));
+    $semantico = new AnalizadorSemantico(new Tokenizador($codigo, $tablaLexica), null, $assetsDir);
     if (!$semantico->Analizar()) {
         $err = $semantico->getError();
         return ['fase' => 'semantico', 'ok' => false, 'codigo' => $err['codigo'] ?? 0, 'mensaje' => $err['mensaje'] ?? 'Error semántico'];
@@ -225,6 +225,49 @@ $casosNegativos = [
         'faseEsperada' => 'semantico',
         'codigoEsp'    => 1707,
     ],
+    [
+        'nombre'       => 'Error semántico 1700c: #imagen con archivo no subido en assetsDir',
+        'codigo'       => '#imagen(ruta=logo.jpg, ancho=50%, alto=auto, alineacion=centro)',
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1700,
+        'emptyAssets'  => true,
+    ],
+    [
+        'nombre'       => 'Error semántico 1704b: #tabla vacía sin #fila',
+        'codigo'       => '#tabla { }',
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1704,
+    ],
+    [
+        'nombre'       => 'Error semántico 1708: #subseccion2 sin #seccion/#subseccion previa',
+        'codigo'       => '#subseccion2 { Apartado }',
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1708,
+    ],
+    [
+        'nombre'       => 'Error semántico 1709a: #indicegeneral duplicado',
+        'codigo'       => "#indicegeneral\n#seccion { Uno }\n#indicegeneral",
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1709,
+    ],
+    [
+        'nombre'       => 'Error semántico 1709b: #seccion anidada dentro de #texto',
+        'codigo'       => '#texto { #seccion { Mal } }',
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1709,
+    ],
+    [
+        'nombre'       => 'Error semántico 1710a: atributo desconocido en #texto',
+        'codigo'       => '#texto(inventado=123) { Hola }',
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1710,
+    ],
+    [
+        'nombre'       => 'Error semántico 1710b: fuente no soportada en #texto',
+        'codigo'       => '#texto(fuente=ComicSans) { Hola }',
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1710,
+    ],
 ];
 
 echo "=========================================================================\n";
@@ -246,9 +289,19 @@ echo "\n------------------------------------------------------------------------
 echo " PRUEBAS NEGATIVAS (DETECCIÓN DE ERRORES LÉXICOS, SINTÁCTICOS Y SEMÁNTICOS)\n";
 echo "-------------------------------------------------------------------------\n\n";
 
+$emptyAssetsDir = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'latinex_empty_' . getmypid();
+@mkdir($emptyAssetsDir, 0777, true);
+register_shutdown_function(static function () use ($emptyAssetsDir): void {
+    @rmdir($emptyAssetsDir);
+});
+
 $aprobadosNeg = 0;
 foreach ($casosNegativos as $caso) {
-    $res = EjecutarPipelineFrente1($caso['codigo'], $tablaLexica);
+    $res = EjecutarPipelineFrente1(
+        $caso['codigo'],
+        $tablaLexica,
+        !empty($caso['emptyAssets']) ? $emptyAssetsDir : null
+    );
     $faseOk = !$res['ok'] && $res['fase'] === $caso['faseEsperada'];
     $codOk  = $caso['codigoEsp'] === null || (($res['codigo'] ?? null) === $caso['codigoEsp']);
 

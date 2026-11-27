@@ -656,6 +656,9 @@ body {
 }
 
 .asset-insert-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
   background: none;
   border: none;
   color: #93c5fd;
@@ -664,14 +667,154 @@ body {
   cursor: pointer;
   padding: 0;
   text-align: start;
+  min-inline-size: 0;
+  flex: 1 1 auto;
+}
+
+.asset-name-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1 1 auto;
+}
+
+.asset-svg-icon {
+  flex-shrink: 0;
+  color: #60a5fa;
+}
+
+.asset-hint {
+  margin: 0;
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.asset-hint code {
+  color: #93c5fd;
+  font-family: 'Fira Code', monospace;
 }
 
 .asset-insert-btn:hover {
   text-decoration: underline;
+}
+
+/* Autocompletado discreto estilo Overleaf para #imagen(ruta=...) */
+.editor-autocomplete-bar {
+  position: absolute;
+  inset-inline: 0.75rem;
+  inset-block-end: 0.65rem;
+  z-index: 6;
+  max-inline-size: 420px;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(96, 165, 250, 0.42);
+  border-radius: 0.55rem;
+  padding: 0.45rem;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+}
+
+.autocomplete-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.69rem;
+  color: var(--text-muted);
+  padding: 0.1rem 0.25rem 0.25rem;
+  border-block-end: 1px solid var(--border);
+}
+
+.autocomplete-head code {
+  color: #93c5fd;
+  font-family: 'Fira Code', monospace;
+}
+
+.autocomplete-kbd {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.64rem;
+  opacity: 0.85;
+}
+
+.autocomplete-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  max-block-size: 148px;
+  overflow-y: auto;
+}
+
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  inline-size: 100%;
+  padding: 0.34rem 0.48rem;
+  border: 1px solid transparent;
+  border-radius: 0.36rem;
+  background: transparent;
+  color: var(--text-main);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: start;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.active {
+  background: rgba(37, 99, 235, 0.22);
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.autocomplete-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autocomplete-badge {
+  font-size: 0.61rem;
+  font-weight: 700;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  padding: 0.06rem 0.32rem;
+  border-radius: 0.26rem;
+}
+
+.autocomplete-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.28rem 0.25rem;
+  font-size: 0.73rem;
+  color: var(--text-soft);
+}
+
+.autocomplete-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.24rem 0.52rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  background: rgba(37, 99, 235, 0.24);
+  color: #dbeafe;
+  font-size: 0.71rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.autocomplete-upload-btn:hover {
+  background: rgba(37, 99, 235, 0.38);
+}
+
+.autocomplete-upload-btn input {
+  display: none;
 }
 
 /* ── Panel Central: Editor + Barra de Formato + Marca de Agua ─ */

@@ -102,7 +102,11 @@ function CompilarCasoCompleto(string $codigo, TablaLexica $tablaLexica, string $
         return ['ok' => false, 'error' => $parser->getError()['mensaje'] ?? 'Error sintáctico'];
     }
 
-    $sem = new AnalizadorSemantico(new Tokenizador($codigo, $tablaLexica));
+    $sem = new AnalizadorSemantico(
+        new Tokenizador($codigo, $tablaLexica),
+        null,
+        $assetsDir !== '' ? $assetsDir : null
+    );
     if (!$sem->Analizar()) {
         return ['ok' => false, 'error' => $sem->getError()['mensaje'] ?? 'Error semántico'];
     }

@@ -25,6 +25,8 @@ class AnalizadorSemantico
 
     private TablaSimbolos $tablaSimbolos;
 
+    private ?string $assetsDir;
+
     private ?array $error = null;
 
     /** @var array<int, string> */
@@ -36,6 +38,52 @@ class AnalizadorSemantico
         T_SUBSECCION2,
         T_SUBSECCION3,
         T_SUBSECCION4,
+    ];
+
+    private const NIVEL_SECCION = [
+        T_SECCION     => 1,
+        T_SUBSECCION  => 2,
+        T_SUBSECCION2 => 3,
+        T_SUBSECCION3 => 4,
+        T_SUBSECCION4 => 5,
+    ];
+
+    private const NOMBRE_NIVEL_SECCION = [
+        1 => '#seccion',
+        2 => '#subseccion',
+        3 => '#subseccion2',
+        4 => '#subseccion3',
+        5 => '#subseccion4',
+    ];
+
+    private const COMANDOS_SOLO_RAIZ = [
+        T_TITULO,
+        T_AUTOR,
+        T_FECHA,
+        T_RESUMEN,
+        T_INDICEGENERAL,
+        T_SECCION,
+        T_SUBSECCION,
+        T_SUBSECCION2,
+        T_SUBSECCION3,
+        T_SUBSECCION4,
+        T_NUEVAPAGINA,
+        T_DEFINIR,
+    ];
+
+    private const DIRECTIVAS_UNICAS = [
+        T_TITULO,
+        T_AUTOR,
+        T_FECHA,
+        T_RESUMEN,
+        T_INDICEGENERAL,
+    ];
+
+    private const FUENTES_VALIDAS = [
+        'helvetica',
+        'courier',
+        'times',
+        'times-roman',
     ];
 
     private const COLORES_NOMINALES = [
@@ -57,10 +105,14 @@ class AnalizadorSemantico
 
     public function __construct(
         Tokenizador $tokenizador,
-        ?TablaSimbolos $tablaSimbolos = null
+        ?TablaSimbolos $tablaSimbolos = null,
+        ?string $assetsDir = null
     ) {
         $this->tokenizador   = $tokenizador;
         $this->tablaSimbolos = $tablaSimbolos ?? new TablaSimbolos();
+        $this->assetsDir     = ($assetsDir !== null && trim($assetsDir) !== '')
+            ? rtrim($assetsDir, "/\\")
+            : null;
     }
 
     /** Ejecuta el análisis semántico en dos pasadas internas. */
@@ -175,12 +227,15 @@ class AnalizadorSemantico
 
     /**
      * Pasada B: recorre todos los comandos (incluyendo bloques anidados)
-     * validando macros, referencias, metadatos y reglas de atributos.
+     * validando macros, referencias, metadatos, jerarquía, unicidad y atributos.
      */
     private function ValidarSentencias(array $tokens): bool
     {
-        $total = count($tokens);
-        $i     = 0;
+        $total              = count($tokens);
+        $i                  = 0;
+        $nivelLlaves        = 0;
+        $nivelSeccionActual = 0;
+        $directivasVistas   = [];
 
         while ($i < $total) {
             $tok = $tokens[$i];
@@ -189,85 +244,194 @@ class AnalizadorSemantico
                 return true;
             }
 
-            if ($tok->token === T_DEFINIR) {
-                $i = $this->ProcesarDefinir($tokens, $i);
-                if ($i < 0) {
+            if ($tok->token === T_ALLAVE) {
+                $nivelLlaves++;
+                $i++;
+                continue;
+            }
+
+            if ($tok->token === T_CLLAVE) {
+                $nivelLlaves = max(0, $nivelLlaves - 1);
+                $i++;
+                continue;
+            }
+
+            // Regla 1709a: Comandos estructurales/globales solo permitidos en el nivel raíz
+            if ($nivelLlaves > 0 && in_array($tok->token, self::COMANDOS_SOLO_RAIZ, true)) {
+                $this->error = $this->CrearError(
+                    1709,
+                    $tok,
+                    sprintf(
+                        "El comando '%s' solo puede declararse en el nivel raíz del documento, no anidado dentro de otro bloque.",
+                        (string) $tok->lexema
+                    )
+                );
+                return false;
+            }
+
+            // Regla 1709b: #superindice y #subindice solo dentro de un bloque de contenido
+            if ($nivelLlaves === 0 && in_array($tok->token, [T_SUPERINDICE, T_SUBINDICE], true)) {
+                $this->error = $this->CrearError(
+                    1709,
+                    $tok,
+                    sprintf(
+                        "El comando '%s' debe usarse dentro de un bloque de contenido como #texto o #ecuacion.",
+                        (string) $tok->lexema
+                    )
+                );
+                return false;
+            }
+
+            // Regla 1709c: Directivas únicas por documento
+            if (in_array($tok->token, self::DIRECTIVAS_UNICAS, true)) {
+                if (isset($directivasVistas[$tok->token])) {
+                    $this->error = $this->CrearError(
+                        1709,
+                        $tok,
+                        sprintf(
+                            "El comando '%s' está duplicado (ya fue declarado en la línea %d); solo se permite uno por documento.",
+                            (string) $tok->lexema,
+                            $directivasVistas[$tok->token]
+                        )
+                    );
                     return false;
                 }
+                $directivasVistas[$tok->token] = $tok->linea;
+            }
+
+            // Regla 1708: Jerarquía estricta de secciones (#seccion..#subseccion4) y título no vacío
+            if (isset(self::NIVEL_SECCION[$tok->token])) {
+                $nivelReq = self::NIVEL_SECCION[$tok->token];
+                if ($nivelReq > $nivelSeccionActual + 1) {
+                    $padreEsperado = self::NOMBRE_NIVEL_SECCION[$nivelSeccionActual + 1];
+                    $this->error = $this->CrearError(
+                        1708,
+                        $tok,
+                        sprintf(
+                            "Jerarquía de secciones inválida: no se puede usar '%s' sin haber abierto antes '%s'.",
+                            (string) $tok->lexema,
+                            $padreEsperado
+                        )
+                    );
+                    return false;
+                }
+
+                $posSec = $i + 1;
+                $this->LeerAtributos($tokens, $posSec);
+                if (isset($tokens[$posSec]) && $tokens[$posSec]->token === T_ALLAVE) {
+                    $cierreSec = $this->EncontrarLlaveCierre($tokens, $posSec);
+                    $tituloSec = $this->ExtraerTextoPlanoRango($tokens, $posSec + 1, $cierreSec - 1);
+                    if ($tituloSec === '') {
+                        $this->error = $this->CrearError(
+                            1708,
+                            $tok,
+                            sprintf("El título de '%s' no puede estar vacío.", (string) $tok->lexema)
+                        );
+                        return false;
+                    }
+                }
+
+                $nivelSeccionActual = $nivelReq;
+            }
+
+            if ($tok->token === T_DEFINIR) {
+                $nuevoI = $this->ProcesarDefinir($tokens, $i);
+                if ($nuevoI < 0) {
+                    return false;
+                }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($tok->token === T_IMPRIMIR) {
-                $i = $this->ProcesarImprimir($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarImprimir($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($tok->token === T_REFERENCIA) {
-                $i = $this->ProcesarReferencia($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarReferencia($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($tok->token === T_IMAGEN) {
-                $i = $this->ProcesarImagen($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarImagen($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($tok->token === T_LISTA) {
-                $i = $this->ProcesarLista($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarLista($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($tok->token === T_FRACCION) {
-                $i = $this->ProcesarFraccion($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarFraccion($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($tok->token === T_CAJA) {
-                $i = $this->ProcesarCaja($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarCaja($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($tok->token === T_TABLA) {
-                $i = $this->ProcesarTabla($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarTabla($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if (in_array($tok->token, [T_TITULO, T_AUTOR, T_FECHA], true)) {
-                $i = $this->ProcesarMetadato($tokens, $i);
-                if ($i < 0) {
+                $nuevoI = $this->ProcesarMetadato($tokens, $i);
+                if ($nuevoI < 0) {
                     return false;
                 }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $nuevoI, $nivelLlaves);
                 continue;
             }
 
             if ($this->EsComandoConAtributos($tok->token)) {
                 $pos       = $i + 1;
                 $atributos = $this->LeerAtributos($tokens, $pos);
-                if (!$this->ValidarAtributosComunes($atributos)) {
+                if (!$this->ValidarAtributosComunes($atributos, $tok)) {
                     return false;
                 }
-                $i = $pos;
+                if ($tok->token === T_FILA && isset($tokens[$pos]) && $tokens[$pos]->token === T_ALLAVE) {
+                    if ($this->ContarHijosDirectos($tokens, $pos, T_CELDA) < 1) {
+                        $this->error = $this->CrearError(
+                            1704,
+                            $tok,
+                            'Cada #fila debe contener al menos una #celda.'
+                        );
+                        return false;
+                    }
+                }
+                $i = $this->AvanzarIndiceActualizandoLlaves($tokens, $i, $pos, $nivelLlaves);
                 continue;
             }
 
@@ -275,6 +439,18 @@ class AnalizadorSemantico
         }
 
         return true;
+    }
+
+    private function AvanzarIndiceActualizandoLlaves(array $tokens, int $desde, int $hasta, int &$nivelLlaves): int
+    {
+        for ($k = $desde; $k < $hasta; $k++) {
+            if ($tokens[$k]->token === T_ALLAVE) {
+                $nivelLlaves++;
+            } elseif ($tokens[$k]->token === T_CLLAVE) {
+                $nivelLlaves = max(0, $nivelLlaves - 1);
+            }
+        }
+        return $hasta;
     }
 
     private function ProcesarDefinir(array $tokens, int $idx): int
@@ -388,7 +564,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, $cmdTok)) {
             return -1;
         }
 
@@ -404,13 +580,50 @@ class AnalizadorSemantico
 
         $tokenRuta = $rutaAttr['valores'][0];
         $ruta      = trim((string) $tokenRuta->lexema);
-        if ($ruta === '' || preg_match('/\.jpe?g$/i', $ruta) !== 1) {
+        if ($ruta === '' || basename($ruta) !== $ruta || str_contains($ruta, '/') || str_contains($ruta, '\\')) {
+            $this->error = $this->CrearError(
+                1700,
+                $tokenRuta,
+                sprintf("Ruta de imagen '%s' inválida; indique solo el nombre de archivo (sin subcarpetas).", $ruta)
+            );
+            return -1;
+        }
+
+        if (preg_match('/\.jpe?g$/i', $ruta) !== 1) {
             $this->error = $this->CrearError(
                 1700,
                 $tokenRuta,
                 sprintf("Ruta de imagen '%s' inválida; solo se admiten archivos JPEG (.jpg o .jpeg).", $ruta)
             );
             return -1;
+        }
+
+        if ($this->assetsDir !== null) {
+            $disponibles = $this->ListarImagenesDisponibles($this->assetsDir);
+            $existeExacto = in_array($ruta, $disponibles, true);
+            $rutaCompleta = $this->assetsDir . DIRECTORY_SEPARATOR . $ruta;
+
+            if (!$existeExacto || !is_file($rutaCompleta)) {
+                $detalleDisponibles = count($disponibles) > 0
+                    ? ' Imágenes disponibles: ' . implode(', ', $disponibles) . '.'
+                    : ' Adjunta primero una imagen (.jpg o .jpeg) en el panel izquierdo.';
+                $this->error = $this->CrearError(
+                    1700,
+                    $tokenRuta,
+                    sprintf("La imagen '%s' no existe en los recursos subidos del documento.%s", $ruta, $detalleDisponibles)
+                );
+                return -1;
+            }
+
+            $infoImg = @getimagesize($rutaCompleta);
+            if ($infoImg === false || ($infoImg[2] ?? 0) !== IMAGETYPE_JPEG) {
+                $this->error = $this->CrearError(
+                    1700,
+                    $tokenRuta,
+                    sprintf("El archivo '%s' no contiene un formato JPEG válido.", $ruta)
+                );
+                return -1;
+            }
         }
 
         foreach ([T_ATTR_ANCHO, T_ATTR_ALTO] as $attrDim) {
@@ -438,7 +651,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, $cmdTok)) {
             return -1;
         }
 
@@ -483,7 +696,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, $cmdTok)) {
             return -1;
         }
 
@@ -530,7 +743,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, $cmdTok)) {
             return -1;
         }
 
@@ -557,7 +770,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, $cmdTok)) {
             return -1;
         }
 
@@ -575,6 +788,15 @@ class AnalizadorSemantico
             }
         }
 
+        if (!isset($tokens[$pos]) || $tokens[$pos]->token !== T_ALLAVE || $this->ContarHijosDirectos($tokens, $pos, T_FILA) < 1) {
+            $this->error = $this->CrearError(
+                1704,
+                $tokens[$pos] ?? $cmdTok,
+                'El comando #tabla debe contener al menos una #fila.'
+            );
+            return -1;
+        }
+
         return $pos;
     }
 
@@ -584,7 +806,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, $cmdTok)) {
             return -1;
         }
 
@@ -615,21 +837,94 @@ class AnalizadorSemantico
     }
 
     /**
-     * Valida atributos transversales (color, fondo, alineacion, tamaño) y banderas posicionales.
+     * Valida atributos transversales (color, fondo, alineacion, tamaño, fuente),
+     * nombres de atributo válidos para el comando y banderas posicionales.
      *
-     * @param array<int, array{claveToken: ?int, clave: ?string, valores: Token[]}> $atributos
+     * @param array<int, array{claveToken: ?int, claveTokObj: ?Token, clave: ?string, valores: Token[]}> $atributos
      */
-    private function ValidarAtributosComunes(array $atributos): bool
+    private function ValidarAtributosComunes(array $atributos, Token $cmdTok): bool
     {
+        $cmdToken = $cmdTok->token;
+
+        $atributosPermitidosPorDueño = [
+            T_ATTR_ID          => self::TOKENS_SECCION,
+            T_ATTR_RUTA        => [T_IMAGEN],
+            T_ATTR_ANCHO       => [T_IMAGEN],
+            T_ATTR_ALTO        => [T_IMAGEN],
+            T_ATTR_BORDES      => [T_TABLA],
+            T_ATTR_NUMERADOR   => [T_FRACCION],
+            T_ATTR_DENOMINADOR => [T_FRACCION],
+            T_ATTR_TIPO        => [T_LISTA, T_CAJA],
+        ];
+
+        $atributosTransversales = [
+            T_ATTR_COLOR,
+            T_ATTR_FONDO,
+            T_ATTR_ALINEACION,
+            T_ATTR_TAMANO,
+            T_ATTR_FUENTE,
+        ];
+
         foreach ($atributos as $attr) {
             $claveToken = $attr['claveToken'];
             $valores    = $attr['valores'];
+            $errClaveTok = $attr['claveTokObj'] ?? $cmdTok;
+
+            // Validar nombre de atributo conocido y perteneciente al comando actual
+            if ($claveToken !== null) {
+                if ($claveToken === T_ID) {
+                    $this->error = $this->CrearError(
+                        1710,
+                        $errClaveTok,
+                        sprintf("Atributo desconocido '%s' en '%s'.", (string) $attr['clave'], (string) $cmdTok->lexema)
+                    );
+                    return false;
+                }
+
+                if (isset($atributosPermitidosPorDueño[$claveToken])) {
+                    if (!in_array($cmdToken, $atributosPermitidosPorDueño[$claveToken], true)) {
+                        $this->error = $this->CrearError(
+                            1710,
+                            $errClaveTok,
+                            sprintf("El atributo '%s' no es válido en el comando '%s'.", (string) $attr['clave'], (string) $cmdTok->lexema)
+                        );
+                        return false;
+                    }
+                } elseif (!in_array($claveToken, $atributosTransversales, true)) {
+                    $this->error = $this->CrearError(
+                        1710,
+                        $errClaveTok,
+                        sprintf("Atributo no soportado '%s' en '%s'.", (string) $attr['clave'], (string) $cmdTok->lexema)
+                    );
+                    return false;
+                }
+            }
 
             if (empty($valores)) {
                 continue;
             }
 
             $primerValor = $valores[0];
+
+            // Bandera posicional sin clave= (p. ej. #texto(derecha), pero NO #texto(alerta))
+            if ($claveToken === null) {
+                if (in_array($cmdToken, [T_LISTA, T_CAJA], true)) {
+                    continue; // Validadas con errores 1701 / 1703 específicos
+                }
+                if (!in_array($primerValor->token, self::ALINEACIONES_VALIDAS, true)) {
+                    $this->error = $this->CrearError(
+                        1706,
+                        $primerValor,
+                        sprintf(
+                            "Bandera posicional '%s' inválida en '%s'; solo se admite izquierda, centro, centrado, derecha o justificado.",
+                            (string) $primerValor->lexema,
+                            (string) $cmdTok->lexema
+                        )
+                    );
+                    return false;
+                }
+                continue;
+            }
 
             // Color o fondo (#RRGGBB / #RGB o color reservado)
             if ($claveToken === T_ATTR_COLOR || $claveToken === T_ATTR_FONDO) {
@@ -669,6 +964,20 @@ class AnalizadorSemantico
                 }
                 continue;
             }
+
+            // Fuente tipográfica Type1 PDF
+            if ($claveToken === T_ATTR_FUENTE) {
+                $nombreFuente = strtolower(trim((string) $primerValor->lexema));
+                if (count($valores) !== 1 || !in_array($nombreFuente, self::FUENTES_VALIDAS, true)) {
+                    $this->error = $this->CrearError(
+                        1710,
+                        $primerValor,
+                        sprintf("Fuente '%s' no soportada; use Helvetica, Courier o Times.", (string) $primerValor->lexema)
+                    );
+                    return false;
+                }
+                continue;
+            }
         }
 
         return true;
@@ -677,7 +986,7 @@ class AnalizadorSemantico
     /**
      * Parsea opcionalmente '( ... )' avanzando $pos hasta después de ')'.
      *
-     * @return array<int, array{claveToken: ?int, clave: ?string, valores: Token[]}>
+     * @return array<int, array{claveToken: ?int, claveTokObj: ?Token, clave: ?string, valores: Token[]}>
      */
     private function LeerAtributos(array $tokens, int &$pos): array
     {
@@ -705,15 +1014,17 @@ class AnalizadorSemantico
                     $pos++;
                 }
                 $resultado[] = [
-                    'claveToken' => $claveTok->token,
-                    'clave'      => (string) $claveTok->lexema,
-                    'valores'    => $valores,
+                    'claveToken'  => $claveTok->token,
+                    'claveTokObj' => $claveTok,
+                    'clave'       => (string) $claveTok->lexema,
+                    'valores'     => $valores,
                 ];
             } else {
                 $resultado[] = [
-                    'claveToken' => null,
-                    'clave'      => null,
-                    'valores'    => [$tokens[$pos]],
+                    'claveToken'  => null,
+                    'claveTokObj' => null,
+                    'clave'       => null,
+                    'valores'     => [$tokens[$pos]],
                 ];
                 $pos++;
             }
@@ -775,6 +1086,56 @@ class AnalizadorSemantico
         }
 
         return $bloques;
+    }
+
+    /** Cuenta comandos `$tokenHijo` directos (profundidad 1) dentro del bloque `{ ... }`. */
+    private function ContarHijosDirectos(array $tokens, int $posApertura, int $tokenHijo): int
+    {
+        $total  = count($tokens);
+        $nivel  = 0;
+        $conteo = 0;
+
+        for ($i = $posApertura; $i < $total; $i++) {
+            if ($tokens[$i]->token === T_ALLAVE) {
+                $nivel++;
+            } elseif ($tokens[$i]->token === T_CLLAVE) {
+                $nivel--;
+                if ($nivel === 0) {
+                    break;
+                }
+            } elseif ($nivel === 1 && $tokens[$i]->token === $tokenHijo) {
+                $conteo++;
+            }
+        }
+
+        return $conteo;
+    }
+
+    /**
+     * Lista archivos .jpg / .jpeg existentes dentro de `$dir` ordenados alfabéticamente.
+     *
+     * @return string[]
+     */
+    private function ListarImagenesDisponibles(string $dir): array
+    {
+        if (!is_dir($dir)) {
+            return [];
+        }
+        $entradas = @scandir($dir);
+        if (!is_array($entradas)) {
+            return [];
+        }
+        $imgs = [];
+        foreach ($entradas as $f) {
+            if ($f === '.' || $f === '..') {
+                continue;
+            }
+            if (is_file($dir . DIRECTORY_SEPARATOR . $f) && preg_match('/\.jpe?g$/i', $f) === 1) {
+                $imgs[] = $f;
+            }
+        }
+        sort($imgs, SORT_NATURAL | SORT_FLAG_CASE);
+        return $imgs;
     }
 
     /** Reconstruye texto legible dentro de un rango de tokens (expande macros asignadas si existen). */

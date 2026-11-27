@@ -105,6 +105,32 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
     }
 
+    // Sincronizar lista activa de imágenes de invitado (elimina archivos quitados en la UI)
+    if ($documentoId === 0 && isset($_POST['guestImageNames'])) {
+        $nombresActivosRaw = json_decode((string) $_POST['guestImageNames'], true);
+        if (is_array($nombresActivosRaw) && is_dir($sessionUploadDir)) {
+            $activosSet = [];
+            foreach ($nombresActivosRaw as $nRaw) {
+                $limpio = preg_replace('/[^a-zA-Z0-9._-]/', '', basename((string) $nRaw));
+                if ($limpio !== '') {
+                    $activosSet[$limpio] = true;
+                }
+            }
+            $archivosPrevios = @scandir($sessionUploadDir);
+            if (is_array($archivosPrevios)) {
+                foreach ($archivosPrevios as $archivoExistente) {
+                    if ($archivoExistente === '.' || $archivoExistente === '..') {
+                        continue;
+                    }
+                    $rutaExistente = $sessionUploadDir . $archivoExistente;
+                    if (is_file($rutaExistente) && !isset($activosSet[$archivoExistente])) {
+                        @unlink($rutaExistente);
+                    }
+                }
+            }
+        }
+    }
+
     if (!empty($_FILES['images']) && is_array($_FILES['images']['name'] ?? null)) {
         if (!is_dir($assetsDir)) {
             mkdir($assetsDir, 0775, true);
@@ -195,7 +221,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $ejecucionData['estado']  = 'OMITIDO_POR_ERROR_SINTACTICO';
         } else {
             // ── Fase 3: Análisis Semántico ────────────────────
-            $semantico       = new AnalizadorSemantico(new Tokenizador($codigo, $tablaLexica));
+            $semantico       = new AnalizadorSemantico(new Tokenizador($codigo, $tablaLexica), null, $assetsDir);
             $semanticoValido = $semantico->Analizar();
 
             $semanticoData = [

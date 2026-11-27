@@ -268,6 +268,9 @@ createApp({
 
     const cursorLn = ref(1);
     const cursorCol = ref(1);
+    const cursorOffset = ref(0);
+    const imgSuggestDismissed = ref(false);
+    const imgSuggestIndex = ref(0);
     const syncHighlightLine = ref(0);
     const editorRef = ref(null);
     const gutterRef = ref(null);
@@ -399,6 +402,65 @@ createApp({
     });
 
     const activeImages = computed(() => activeDoc.value?.imagenes || []);
+    const availableImageNames = computed(() => {
+      if (user.value && activeDoc.value) {
+        return activeImages.value.map((img) => img.nombre_archivo);
+      }
+      return guestImages.value.map((f) => f.name);
+    });
+
+    // Autocompletado discreto estilo Overleaf para #imagen(... ruta=...)
+    const imageRouteAutocomplete = computed(() => {
+      const closed = { open: false, prefix: '', replaceStart: 0, replaceEnd: 0, matches: [] };
+      if (imgSuggestDismissed.value) return closed;
+
+      const offset = cursorOffset.value;
+      const code = codigoFuente.value;
+      if (offset < 0 || offset > code.length) return closed;
+
+      const windowStart = Math.max(0, offset - 240);
+      const sliceBefore = code.slice(windowStart, offset);
+      const imgCallMatch = sliceBefore.match(/#imagen\s*\(([^)]*)$/i);
+      if (!imgCallMatch) return closed;
+
+      const insideAttrs = imgCallMatch[1];
+      const rutaMatch = insideAttrs.match(/(?:^|,)\s*ruta\s*=\s*([a-zA-Z0-9._-]*)$/i);
+      if (!rutaMatch) return closed;
+
+      const prefix = rutaMatch[1] || '';
+      const replaceStart = offset - prefix.length;
+      let replaceEnd = offset;
+      while (replaceEnd < code.length && /[a-zA-Z0-9._-]/.test(code[replaceEnd])) {
+        replaceEnd++;
+      }
+
+      const lista = availableImageNames.value;
+      const q = prefix.toLowerCase();
+      const matches = q === ''
+        ? [...lista]
+        : [
+            ...lista.filter((n) => n.toLowerCase().startsWith(q)),
+            ...lista.filter((n) => !n.toLowerCase().startsWith(q) && n.toLowerCase().includes(q))
+          ];
+
+      if (
+        matches.length === 1 &&
+        matches[0].toLowerCase() === q &&
+        offset === replaceEnd
+      ) {
+        return closed;
+      }
+
+      return { open: true, prefix, replaceStart, replaceEnd, matches };
+    });
+
+    watch(imageRouteAutocomplete, (val) => {
+      if (!val.open || val.matches.length === 0) {
+        imgSuggestIndex.value = 0;
+      } else if (imgSuggestIndex.value >= val.matches.length) {
+        imgSuggestIndex.value = 0;
+      }
+    });
     const tokensAnalizados = computed(() => compileResult.value?.lexico?.tokens || []);
     const sintacticoPasos = computed(() => compileResult.value?.sintactico?.transiciones || []);
     const tablaSimbolos = computed(() => compileResult.value?.semantico?.tablaSimbolos || []);
@@ -828,6 +890,7 @@ createApp({
     };
 
     const alEditarCodigo = (e) => {
+      imgSuggestDismissed.value = false;
       actualizarPosicionCursor();
       persistirBorradorCambio();
 
@@ -1131,12 +1194,26 @@ createApp({
       if (snippetsPopoverRef.value?.matches?.(':popover-open')) {
         snippetsPopoverRef.value.hidePopover();
       }
+      let textoSnippet = snippet;
+      if (textoSnippet.includes('ruta=logo.jpg') && availableImageNames.value.length > 0) {
+        textoSnippet = textoSnippet.replace('ruta=logo.jpg', `ruta=${availableImageNames.value[0]}`);
+      }
       const ta = editorRef.value;
       const start = ta?.selectionStart ?? codigoFuente.value.length;
       const end = ta?.selectionEnd ?? start;
-      const nuevo = codigoFuente.value.slice(0, start) + snippet + codigoFuente.value.slice(end);
-      const pos = start + snippet.length;
+      const nuevo = codigoFuente.value.slice(0, start) + textoSnippet + codigoFuente.value.slice(end);
+      const pos = start + textoSnippet.length;
       await aplicarCambioTransaccional(nuevo, pos, pos);
+    };
+
+    const aplicarSugerenciaImagen = async (nombreArchivo) => {
+      const ac = imageRouteAutocomplete.value;
+      if (!ac.open || !nombreArchivo) return;
+      const code = codigoFuente.value;
+      const nuevo = code.slice(0, ac.replaceStart) + nombreArchivo + code.slice(ac.replaceEnd);
+      const nuevaPos = ac.replaceStart + nombreArchivo.length;
+      imgSuggestDismissed.value = true;
+      await aplicarCambioTransaccional(nuevo, nuevaPos, nuevaPos);
     };
 
     // ── Renderizador PDF.js Double-Buffered de Solo Lectura + SyncTeX ─
@@ -1441,6 +1518,7 @@ createApp({
         if (user.value && activeDoc.value) {
           fd.append('documentoId', String(activeDoc.value.id));
         } else {
+          fd.append('guestImageNames', JSON.stringify(guestImages.value.map((img) => img.name)));
           guestImages.value.forEach((img, i) => fd.append(`images[${i}]`, img));
         }
 
@@ -1540,7 +1618,12 @@ createApp({
     const actualizarPosicionCursor = () => {
       const ta = editorRef.value;
       if (!ta) return;
-      const hastaCursor = codigoFuente.value.slice(0, ta.selectionStart || 0);
+      const pos = ta.selectionStart || 0;
+      if (pos !== cursorOffset.value) {
+        imgSuggestDismissed.value = false;
+      }
+      cursorOffset.value = pos;
+      const hastaCursor = codigoFuente.value.slice(0, pos);
       const lineas = hastaCursor.split('\n');
       cursorLn.value = lineas.length;
       cursorCol.value = lineas[lineas.length - 1].length + 1;
@@ -1642,6 +1725,32 @@ createApp({
     const manejarAtajosEditor = (e) => {
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
+      const ac = imageRouteAutocomplete.value;
+
+      if (ac.open && !mod) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          imgSuggestDismissed.value = true;
+          return;
+        }
+        if (ac.matches.length > 0) {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            imgSuggestIndex.value = (imgSuggestIndex.value + 1) % ac.matches.length;
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            imgSuggestIndex.value = (imgSuggestIndex.value - 1 + ac.matches.length) % ac.matches.length;
+            return;
+          }
+          if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            aplicarSugerenciaImagen(ac.matches[imgSuggestIndex.value] || ac.matches[0]);
+            return;
+          }
+        }
+      }
 
       if (mod && e.key === 'Enter') {
         e.preventDefault();
@@ -1822,9 +1931,8 @@ createApp({
       }
     };
 
-    const subirImagen = async (e) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
+    const guardarArchivoImagen = async (files) => {
+      if (!files || files.length === 0) return null;
 
       if (user.value && activeDoc.value) {
         const fd = new FormData();
@@ -1840,13 +1948,50 @@ createApp({
           const data = await res.json();
           if (!res.ok) throw new Error(data.message || 'No se pudo subir la imagen.');
           activeDoc.value.imagenes = [...activeImages.value, data.imagen];
+          return data.imagen?.nombre_archivo || null;
         } catch (err) {
           alert(err.message);
+          return null;
         }
-      } else {
-        for (let i = 0; i < files.length; i++) guestImages.value.push(files[i]);
       }
+
+      let ultimoNombre = null;
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (!/\.(jpe?g)$/i.test(f.name)) {
+          alert(`El archivo "${f.name}" no es admitido. El generador %PDF-1.4 solo soporta imágenes .jpg o .jpeg.`);
+          continue;
+        }
+        if (f.size > 2 * 1024 * 1024) {
+          alert(`La imagen "${f.name}" supera el límite de 2 MB.`);
+          continue;
+        }
+        const existenteIdx = guestImages.value.findIndex((g) => g.name.toLowerCase() === f.name.toLowerCase());
+        if (existenteIdx >= 0) {
+          guestImages.value.splice(existenteIdx, 1, f);
+          ultimoNombre = f.name;
+        } else if (guestImages.value.length >= 5) {
+          alert('En modo invitado se permiten hasta 5 imágenes (.jpg o .jpeg) por sesión.');
+          break;
+        } else {
+          guestImages.value.push(f);
+          ultimoNombre = f.name;
+        }
+      }
+      return ultimoNombre;
+    };
+
+    const subirImagen = async (e) => {
+      await guardarArchivoImagen(e.target.files);
       e.target.value = '';
+    };
+
+    const subirImagenYCompletarRuta = async (e) => {
+      const subido = await guardarArchivoImagen(e.target.files);
+      e.target.value = '';
+      if (subido) {
+        await aplicarSugerenciaImagen(subido);
+      }
     };
 
     const eliminarImagenDocumento = async (imageId) => {
@@ -1922,6 +2067,9 @@ createApp({
       isSaving,
       guestImages,
       activeImages,
+      availableImageNames,
+      imageRouteAutocomplete,
+      imgSuggestIndex,
       activeFilename,
       codigoFuente,
       highlightedCode,
@@ -2023,6 +2171,7 @@ createApp({
       seleccionarTab,
       cargarCasoSeleccionado,
       insertarSnippet,
+      aplicarSugerenciaImagen,
       actualizarPosicionCursor,
       sincronizarScroll,
       irALinea,
@@ -2038,6 +2187,7 @@ createApp({
       abrirEliminarDialog,
       confirmarEliminarDoc,
       subirImagen,
+      subirImagenYCompletarRuta,
       eliminarImagenDocumento
     };
   }
