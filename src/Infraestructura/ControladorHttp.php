@@ -9,19 +9,46 @@ namespace Latinex\Infraestructura;
  */
 class ControladorHttp
 {
-    public static function configurarCabecerasJson(string $metodosPermitidos = 'GET, POST, PUT, DELETE, OPTIONS'): void
+    public static function esOrigenPermitido(string $origin): bool
     {
-        header('Content-Type: application/json; charset=utf-8');
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        if ($origin === '') {
+            return false;
+        }
 
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        if ($origin !== '') {
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        if ($host !== '' && ($origin === "http://{$host}" || $origin === "https://{$host}")) {
+            return true;
+        }
+
+        $listaEnv = trim((string) ($_ENV['CORS_ALLOWED_ORIGINS'] ?? $_SERVER['CORS_ALLOWED_ORIGINS'] ?? getenv('CORS_ALLOWED_ORIGINS') ?: ''));
+        if ($listaEnv !== '') {
+            $permitidos = array_map('trim', explode(',', $listaEnv));
+            if (in_array($origin, $permitidos, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function aplicarCorsControlado(string $metodosPermitidos = 'GET, POST, PUT, DELETE, OPTIONS'): void
+    {
+        $origin = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+        if ($origin !== '' && self::esOrigenPermitido($origin)) {
             header("Access-Control-Allow-Origin: {$origin}");
             header('Access-Control-Allow-Credentials: true');
             header('Vary: Origin');
         }
         header("Access-Control-Allow-Methods: {$metodosPermitidos}");
         header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');
+    }
+
+    public static function configurarCabecerasJson(string $metodosPermitidos = 'GET, POST, PUT, DELETE, OPTIONS'): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+
+        self::aplicarCorsControlado($metodosPermitidos);
 
         if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
             http_response_code(200);

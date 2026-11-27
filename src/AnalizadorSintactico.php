@@ -122,11 +122,13 @@ class AnalizadorSintactico
         ] + array_fill_keys(array_keys($atributosClave), 14);
 
         $identificadoresEnDefinir = [
-            T_ID => 10,
+            T_ID     => 10,
+            T_NUMERO => 10,
         ] + array_fill_keys(array_keys($atributosClave + $banderasPosicionales), 10);
 
         $identificadoresEnReferencia = [
-            T_ID => 16,
+            T_ID     => 16,
+            T_NUMERO => 16,
         ] + array_fill_keys(array_keys($atributosClave + $banderasPosicionales), 16);
 
         $this->transiciones = [

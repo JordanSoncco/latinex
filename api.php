@@ -1,17 +1,5 @@
 <?php
 
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($origin !== '') {
-    header("Access-Control-Allow-Origin: {$origin}");
-    header('Access-Control-Allow-Credentials: true');
-    header('Vary: Origin');
-} else {
-    header('Access-Control-Allow-Origin: *');
-}
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, X-CSRF-Token");
-header('Content-Type: application/json; charset=utf-8');
-
 require_once __DIR__ . '/src/TablaLexica.php';
 require_once __DIR__ . '/src/Tokenizador.php';
 require_once __DIR__ . '/src/AnalizadorSintactico.php';
@@ -23,16 +11,21 @@ require_once __DIR__ . '/src/Infraestructura/ExcepcionDominio.php';
 require_once __DIR__ . '/src/Infraestructura/ConexionBD.php';
 require_once __DIR__ . '/src/Infraestructura/RepositorioDocumentos.php';
 require_once __DIR__ . '/src/Infraestructura/ServicioAutenticacion.php';
+require_once __DIR__ . '/src/Infraestructura/ControladorHttp.php';
 
 use Latinex\AnalizadorSemantico;
 use Latinex\AnalizadorSintactico;
 use Latinex\Ejecutor;
 use Latinex\Infraestructura\ConexionBD;
+use Latinex\Infraestructura\ControladorHttp;
 use Latinex\Infraestructura\RepositorioDocumentos;
 use Latinex\Infraestructura\ServicioAutenticacion;
 use Latinex\PdfGenerator;
 use Latinex\TablaLexica;
 use Latinex\Tokenizador;
+
+ControladorHttp::aplicarCorsControlado('POST, GET, OPTIONS');
+header('Content-Type: application/json; charset=utf-8');
 
 // ── Preflight CORS ────────────────────────────────────────────
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
@@ -100,24 +93,62 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
 
         $assetsDir = $repoDocs->rutaAssetsDocumento((int) $usuario['id'], $documentoId);
-        if (!is_dir($assetsDir)) {
-            @mkdir($assetsDir, 0775, true);
-        }
     }
 
-    if (!empty($_FILES['images']) && is_array($_FILES['images']['name'] ?? null)) {
-        if (!is_dir($assetsDir)) {
-            mkdir($assetsDir, 0775, true);
-        }
-        $files = $_FILES['images'];
-        $count = count($files['name']);
-        for ($i = 0; $i < $count; $i++) {
-            $tmpName = $files['tmp_name'][$i] ?? '';
-            $name    = preg_replace("/[^a-zA-Z0-9._-]/", '', basename((string) ($files['name'][$i] ?? '')));
-            if ($name !== '' && is_uploaded_file($tmpName)) {
-                move_uploaded_file($tmpName, $assetsDir . $name);
+    // Subidas efímeras permitidas únicamente en Modo Invitado (con validación JPEG, tamaño y limpieza TTL)
+    if ($documentoId === 0 && !empty($_FILES['images']) && is_array($_FILES['images']['name'] ?? null)) {
+        if (is_dir($uploadDir)) {
+            $limiteAntiguedad = time() - 3600;
+            foreach (scandir($uploadDir) ?: [] as $entrada) {
+                if ($entrada === '.' || $entrada === '..' || $entrada === '.gitkeep' || $entrada === $sessionId) {
+                    continue;
+                }
+                $rutaSesion = $uploadDir . $entrada;
+                if (is_dir($rutaSesion) && (@filemtime($rutaSesion) ?: 0) < $limiteAntiguedad) {
+                    foreach (scandir($rutaSesion) ?: [] as $f) {
+                        if ($f !== '.' && $f !== '..') {
+                            @unlink($rutaSesion . '/' . $f);
+                        }
+                    }
+                    @rmdir($rutaSesion);
+                }
             }
         }
+
+        if (!is_dir($sessionUploadDir)) {
+            @mkdir($sessionUploadDir, 0775, true);
+        }
+
+        $files = $_FILES['images'];
+        $count = min(count($files['name']), RepositorioDocumentos::MAX_IMAGENES_POR_DOCUMENTO);
+        for ($i = 0; $i < $count; $i++) {
+            $tmpName = (string) ($files['tmp_name'][$i] ?? '');
+            $errCode = (int) ($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            $size    = (int) ($files['size'][$i] ?? 0);
+            $name    = preg_replace('/[^a-zA-Z0-9._-]/', '', basename((string) ($files['name'][$i] ?? ''))) ?? '';
+            $name    = ltrim($name, '._-');
+
+            if (
+                $errCode !== UPLOAD_ERR_OK
+                || $name === ''
+                || !preg_match('/\.(jpe?g)$/i', $name)
+                || $size <= 0
+                || $size > RepositorioDocumentos::MAX_BYTES_IMAGEN
+                || !is_file($tmpName)
+            ) {
+                continue;
+            }
+
+            $infoImg = @getimagesize($tmpName);
+            if (!is_array($infoImg) || ($infoImg[2] ?? 0) !== IMAGETYPE_JPEG) {
+                continue;
+            }
+
+            if (is_uploaded_file($tmpName)) {
+                move_uploaded_file($tmpName, $sessionUploadDir . $name);
+            }
+        }
+        @touch($sessionUploadDir);
     }
 
     $tablaLexica = new TablaLexica();
@@ -212,9 +243,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $ejecucionData['estado'] = 'OMITIDO_POR_ERROR_SEMANTICO';
             } else {
                 // ── Fase 4: Ejecución Two-Pass y Síntesis PDF ─
-                $ejecutor       = new Ejecutor(new Tokenizador($codigo, $tablaLexica), null, $assetsDir);
+                $ejecutor       = new Ejecutor(new Tokenizador($codigo, $tablaLexica), clone $semantico->getTablaSimbolos(), $assetsDir);
                 $ejecucionOk    = $ejecutor->Ejecutar();
                 $resumen        = $ejecutor->getResumen();
+                if ($ejecucionOk) {
+                    $semanticoData['tablaSimbolos'] = $ejecutor->getTablaSimbolos()->ObtenerTodos();
+                }
                 $pdfGen         = new PdfGenerator(
                     $ejecutor->getElementos(),
                     $ejecutor->getMetadatos(),
@@ -230,13 +264,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     }
                 }
 
+                $elementosVista = array_map(static function (array $el): array {
+                    if (($el['tipo'] ?? '') === 'image' && !empty($el['ruta']) && is_file((string) $el['ruta'])) {
+                        $rawImg = @file_get_contents((string) $el['ruta']);
+                        if (is_string($rawImg) && $rawImg !== '' && strlen($rawImg) <= 2097152) {
+                            $el['dataUrl'] = 'data:image/jpeg;base64,' . base64_encode($rawImg);
+                        }
+                    }
+                    return $el;
+                }, $ejecutor->getElementos());
+
                 $ejecucionData = [
                     'valido'            => $ejecucionOk,
                     'implementado'      => $pdfImplementado && ($resumen['implementado'] ?? false),
                     'estado'            => !$ejecucionOk
                         ? 'RECHAZADO'
                         : ($pdfImplementado ? 'ACEPTADO' : 'PENDIENTE_FRENTE_2'),
-                    'figurasOElementos' => $ejecutor->getElementos(),
+                    'figurasOElementos' => $elementosVista,
                     'resumen'           => $resumen,
                     'pdfStats'          => $pdfGen->getStats(),
                     'pdfBase64'         => $pdfBase64,

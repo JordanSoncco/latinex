@@ -24,7 +24,7 @@ namespace Latinex;
  */
 class PdfGenerator
 {
-    /** Fuentes estándar Type1 registradas en los recursos de cada página */
+    /** Fuentes estándar Type1 con WinAnsiEncoding registradas en los recursos de cada página */
     private const FUENTES_BASE = [
         'F1' => 'Helvetica',
         'F2' => 'Helvetica-Bold',
@@ -32,6 +32,34 @@ class PdfGenerator
         'F4' => 'Helvetica-BoldOblique',
         'F5' => 'Courier',
         'F6' => 'Times-Roman',
+    ];
+
+    /**
+     * Mapa de caracteres Unicode científicos y griegos al código octal/byte de la
+     * fuente estándar PDF Type1 /Symbol (Adobe SymbolEncoding, sin librerías externas).
+     */
+    private const MAPA_SYMBOL = [
+        // Alfabeto griego mayúsculas
+        'Α' => "\x41", 'Β' => "\x42", 'Γ' => "\x47", 'Δ' => "\x44", 'Ε' => "\x45",
+        'Ζ' => "\x5A", 'Η' => "\x48", 'Θ' => "\x51", 'Ι' => "\x49", 'Κ' => "\x4B",
+        'Λ' => "\x4C", 'Μ' => "\x4D", 'Ν' => "\x4E", 'Ξ' => "\x58", 'Ο' => "\x4F",
+        'Π' => "\x50", 'Ρ' => "\x52", 'Σ' => "\x53", 'Τ' => "\x54", 'Υ' => "\x55",
+        'Φ' => "\x46", 'Χ' => "\x43", 'Ψ' => "\x59", 'Ω' => "\x57",
+        // Alfabeto griego minúsculas
+        'α' => "\x61", 'β' => "\x62", 'γ' => "\x67", 'δ' => "\x64", 'ε' => "\x65",
+        'ζ' => "\x7A", 'η' => "\x68", 'θ' => "\x71", 'ι' => "\x69", 'κ' => "\x6B",
+        'λ' => "\x6C", 'μ' => "\x6D", 'ν' => "\x6E", 'ξ' => "\x78", 'ο' => "\x6F",
+        'π' => "\x70", 'ρ' => "\x72", 'ς' => "\x56", 'σ' => "\x73", 'τ' => "\x74",
+        'υ' => "\x75", 'φ' => "\x66", 'χ' => "\x63", 'ψ' => "\x79", 'ω' => "\x77",
+        // Operadores matemáticos y lógicos estándar
+        '∀' => "\x22", '∃' => "\x24", '≅' => "\x40", '∴' => "\x5C", '⊥' => "\x5E",
+        '≤' => "\xA3", '∞' => "\xA5", '↔' => "\xAB", '←' => "\xAC", '↑' => "\xAD",
+        '→' => "\xAE", '↓' => "\xAF", '≥' => "\xB3", '∝' => "\xB5", '∂' => "\xB6",
+        '≠' => "\xB9", '≡' => "\xBA", '≈' => "\xBB", '∩' => "\xC7", '∪' => "\xC8",
+        '⊂' => "\xCC", '⊆' => "\xCD", '∈' => "\xCE", '∉' => "\xCF", '∇' => "\xD1",
+        '∏' => "\xD5", '√' => "\xD6", '∧' => "\xD9", '∨' => "\xDA", '⇔' => "\xDB",
+        '⇐' => "\xDC", '⇑' => "\xDD", '⇒' => "\xDE", '⇓' => "\xDF", '∑' => "\xE5",
+        '∫' => "\xF2",
     ];
 
     /** @var array<int, array<string, mixed>> */
@@ -106,6 +134,13 @@ class PdfGenerator
             );
         }
 
+        // Registrar /F7 (/Symbol con su codificación intrínseca SymbolEncoding) solo si se emplean glifos matemáticos/griegos
+        if ($this->ContieneGlifosSymbol()) {
+            $idSymbol = $nextId++;
+            $fontObjIds['F7'] = $idSymbol;
+            $objetos[$idSymbol] = '<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>';
+        }
+
         // 3. Registrar XObjects JPEG únicos (/Im1, /Im2, ...) con flujo crudo /DCTDecode
         $imagenesPorRuta = [];
         $xObjectRefs     = [];
@@ -168,9 +203,12 @@ class PdfGenerator
         $resourcesDict = sprintf('<< /Font %s%s >>', $fontDict, $xObjDict);
 
         // 4. Construir flujos PostScript y objetos /Page para cada hoja A4
-        $kidsRefs = [];
+        $kidsRefs     = [];
+        $totalPaginas = count($porPagina);
+        $mostrarPie   = !empty($this->elementos);
+
         foreach ($porPagina as $numPag => $listaElem) {
-            $streamTxt = $this->ConstruirStreamPagina($listaElem, $imagenesPorRuta);
+            $streamTxt = $this->ConstruirStreamPagina($listaElem, $imagenesPorRuta, (int) $numPag, $totalPaginas, $mostrarPie);
             $lenStream = strlen($streamTxt);
 
             $idContent = $nextId++;
@@ -253,8 +291,13 @@ class PdfGenerator
      * @param array<int, array<string, mixed>> $elementosPagina
      * @param array<string, string>            $imagenesPorRuta
      */
-    private function ConstruirStreamPagina(array $elementosPagina, array $imagenesPorRuta): string
-    {
+    private function ConstruirStreamPagina(
+        array $elementosPagina,
+        array $imagenesPorRuta,
+        int $numPagina = 1,
+        int $totalPaginas = 1,
+        bool $incluirPie = false
+    ): string {
         $ops = [];
 
         foreach ($elementosPagina as $el) {
@@ -265,14 +308,21 @@ class PdfGenerator
                 if ($fuente === '' || $fuente[0] !== '/') {
                     $fuente = '/' . $fuente;
                 }
-                $tamano = (float) ($el['tamano'] ?? 12.0);
-                $x      = (float) ($el['x'] ?? 50.0);
-                $yPdf   = isset($el['yPdf'])
+                $tamano   = (float) ($el['tamano'] ?? 12.0);
+                $x        = (float) ($el['x'] ?? 50.0);
+                $yPdf     = isset($el['yPdf'])
                     ? (float) $el['yPdf']
                     : (842.0 - (float) ($el['yLogica'] ?? 62.0));
-                $rgb    = $this->FormatearColor($el['color'] ?? [0.0, 0.0, 0.0]);
-                $tw     = (float) ($el['tw'] ?? 0.0);
-                $cadena = $this->CodificarCadenaPdf((string) ($el['texto'] ?? ''));
+                $rgb      = $this->FormatearColor($el['color'] ?? [0.0, 0.0, 0.0]);
+                $tw       = (float) ($el['tw'] ?? 0.0);
+                $rawTexto = (string) ($el['texto'] ?? '');
+
+                if ($this->TextoContieneSymbol($rawTexto)) {
+                    $ops[] = $this->ConstruirOperacionTextoMixto($fuente, $tamano, $rgb, $tw, $x, $yPdf, $rawTexto);
+                    continue;
+                }
+
+                $cadena = $this->CodificarCadenaPdf($rawTexto);
 
                 if (abs($tw) > 0.0005) {
                     $ops[] = sprintf(
@@ -410,6 +460,19 @@ class PdfGenerator
             }
         }
 
+        // Pie de página editorial automático ("Página X de Y") en el margen inferior A4
+        if ($incluirPie) {
+            $ops[]    = 'q 0.820 0.855 0.902 RG 0.45 w 50.00 38.00 m 545.00 38.00 l S Q';
+            $etiqueta = sprintf('Página %d de %d', $numPagina, $totalPaginas);
+            $anchoEst = strlen($etiqueta) * 4.4;
+            $xPie     = max(50.0, (595.0 - $anchoEst) / 2.0);
+            $ops[]    = sprintf(
+                'BT /F1 8.50 Tf 0.420 0.475 0.545 rg %.2f 25.00 Td (%s) Tj ET',
+                $xPie,
+                $this->CodificarCadenaPdf($etiqueta)
+            );
+        }
+
         return implode("\n", $ops);
     }
 
@@ -433,19 +496,93 @@ class PdfGenerator
         return '<< ' . implode(' ', $entradas) . ' >>';
     }
 
+    private function ContieneGlifosSymbol(): bool
+    {
+        foreach ($this->elementos as $el) {
+            if (($el['tipo'] ?? '') === 'text' && $this->TextoContieneSymbol((string) ($el['texto'] ?? ''))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function TextoContieneSymbol(string $texto): bool
+    {
+        if ($texto === '') {
+            return false;
+        }
+        foreach (self::MAPA_SYMBOL as $utf8Char => $_byte) {
+            if (str_contains($texto, $utf8Char)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Emite una secuencia continua dentro de `BT ... ET` alternando entre la fuente
+     * base (`/F1`..`/F6`) y la fuente científica nativa `/F7` (`/Symbol`).
+     */
+    private function ConstruirOperacionTextoMixto(
+        string $fuenteBase,
+        float $tamano,
+        string $rgb,
+        float $tw,
+        float $x,
+        float $yPdf,
+        string $texto
+    ): string {
+        $chars = mb_str_split($texto, 1, 'UTF-8');
+        $runs  = [];
+
+        foreach ($chars as $ch) {
+            $esSym = isset(self::MAPA_SYMBOL[$ch]);
+            $n     = count($runs);
+            if ($n > 0 && $runs[$n - 1]['sym'] === $esSym) {
+                $runs[$n - 1]['txt'] .= $ch;
+            } else {
+                $runs[] = ['sym' => $esSym, 'txt' => $ch];
+            }
+        }
+
+        $partes = ['BT', $rgb . ' rg'];
+        if (abs($tw) > 0.0005) {
+            $partes[] = sprintf('%.3f Tw', $tw);
+        }
+        $partes[] = sprintf('%.2f %.2f Td', $x, $yPdf);
+
+        foreach ($runs as $run) {
+            if ($run['sym']) {
+                $bytesSym = strtr($run['txt'], self::MAPA_SYMBOL);
+                $escapado = strtr($bytesSym, [
+                    '\\' => '\\\\',
+                    '('  => '\\(',
+                    ')'  => '\\)',
+                    "\r" => '\\r',
+                    "\n" => '\\n',
+                ]);
+                $partes[] = sprintf('/F7 %.2f Tf (%s) Tj', $tamano, $escapado);
+            } else {
+                $partes[] = sprintf('%s %.2f Tf (%s) Tj', $fuenteBase, $tamano, $this->CodificarCadenaPdf($run['txt']));
+            }
+        }
+
+        if (abs($tw) > 0.0005) {
+            $partes[] = '0 Tw';
+        }
+        $partes[] = 'ET';
+
+        return implode(' ', $partes);
+    }
+
     /**
      * Convierte una cadena UTF-8 a Windows-1252 (WinAnsiEncoding) y escapa \, ( y ).
      */
     private function CodificarCadenaPdf(string $texto): string
     {
-        // Normalizar símbolos matemáticos Unicode fuera de CP1252 antes de convertir
+        // Normalizar guiones/signos matemáticos básicos antes de convertir a CP1252
         $mapaPrevio = [
             '−' => '-', // signo menos matemático U+2212
-            '×' => 'x',
-            '÷' => '/',
-            '≤' => '<=',
-            '≥' => '>=',
-            '≠' => '!=',
         ];
         $limpio = strtr($texto, $mapaPrevio);
 

@@ -10,7 +10,7 @@ if [[ -z "$INSTANCE_ID" || "$INSTANCE_ID" == "None" ]]; then
   exit 1
 fi
 
-SSM_PARAMS='{"commands":["set -euo pipefail","export HOME=/root","cd /opt/latinex","git fetch origin main","git reset --hard origin/main","docker build -t latinex-app . && docker compose up -d --no-build","for k in $(seq 1 15); do curl -fsS http://127.0.0.1/auth.php?action=me >/dev/null && break; sleep 2; done","docker compose ps","curl -fsS http://127.0.0.1/auth.php?action=me"]}'
+SSM_PARAMS='{"commands":["set -euo pipefail","export HOME=/root","cd /opt/latinex","git fetch origin main","git reset --hard origin/main","docker build -t latinex-app . && docker compose up -d --no-build","for k in $(seq 1 15); do curl -fsS http://127.0.0.1/auth.php?action=me >/dev/null && break; sleep 2; done","docker compose ps","docker compose exec -T app php test_pdf.php","docker compose exec -T app php test_e2e.php","curl -fsS http://127.0.0.1/auth.php?action=me"]}'
 CMD_ID="$(aws ssm send-command --region "$REGION" --instance-ids "$INSTANCE_ID" --document-name "AWS-RunShellScript" --parameters "$SSM_PARAMS" --query "Command.CommandId" --output text)"
 
 for _ in $(seq 1 60); do

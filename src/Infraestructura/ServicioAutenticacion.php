@@ -24,6 +24,14 @@ class ServicioAutenticacion
     public function iniciarContextoSesion(): void
     {
         if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+            $dirSesiones = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'sesiones';
+            if (!is_dir($dirSesiones)) {
+                @mkdir($dirSesiones, 0700, true);
+            }
+            if (is_dir($dirSesiones) && is_writable($dirSesiones)) {
+                @session_save_path($dirSesiones);
+            }
+
             session_set_cookie_params([
                 'lifetime' => 86400 * 7,
                 'path'     => '/',
@@ -78,9 +86,60 @@ class ServicioAutenticacion
         return $usuario;
     }
 
+    private function verificarLimiteIntentos(string $accion, int $maxPorVentana = 15, int $ventanaSegundos = 60): void
+    {
+        $ip     = (string) ($_SERVER['REMOTE_ADDR'] ?? 'cli');
+        $dir    = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'latinex_ratelimit';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0700, true);
+        }
+
+        $archivo = $dir . DIRECTORY_SEPARATOR . hash('sha256', $accion . '|' . $ip) . '.json';
+        $ahora   = time();
+        $marcas  = [];
+
+        $fp = @fopen($archivo, 'c+');
+        if ($fp === false) {
+            return;
+        }
+
+        try {
+            if (@flock($fp, LOCK_EX)) {
+                $raw = stream_get_contents($fp);
+                if (is_string($raw) && $raw !== '') {
+                    $dec = json_decode($raw, true);
+                    if (is_array($dec)) {
+                        $marcas = array_values(array_filter(
+                            $dec,
+                            static fn($t): bool => is_int($t) && ($ahora - $t) < $ventanaSegundos
+                        ));
+                    }
+                }
+
+                if (count($marcas) >= $maxPorVentana) {
+                    throw new ExcepcionDominio(
+                        'Demasiados intentos seguidos. Espera un minuto antes de volver a intentarlo.',
+                        429,
+                        'DEMASIADOS_INTENTOS'
+                    );
+                }
+
+                $marcas[] = $ahora;
+                ftruncate($fp, 0);
+                rewind($fp);
+                fwrite($fp, (string) json_encode($marcas));
+                fflush($fp);
+                @flock($fp, LOCK_UN);
+            }
+        } finally {
+            fclose($fp);
+        }
+    }
+
     public function registrar(string $nombre, string $correo, string $password): array
     {
         $this->iniciarContextoSesion();
+        $this->verificarLimiteIntentos('register', 15, 60);
 
         $nombreLimpio = trim($nombre);
         $correoLimpio = mb_strtolower(trim($correo));
@@ -182,6 +241,7 @@ class ServicioAutenticacion
     public function iniciarSesion(string $correo, string $password): array
     {
         $this->iniciarContextoSesion();
+        $this->verificarLimiteIntentos('login', 20, 60);
 
         $correoLimpio = mb_strtolower(trim($correo));
         if ($correoLimpio === '' || $password === '') {

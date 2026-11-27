@@ -148,6 +148,18 @@ $casosNegativos = [
         'codigoEsp'    => 1600,
     ],
     [
+        'nombre'       => 'Error semántico 1601a: macro autorreferencial directa',
+        'codigo'       => "#definir(a) { base }\n#definir(a) { #imprimir(a) }\n#texto { #imprimir(a) }",
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1601,
+    ],
+    [
+        'nombre'       => 'Error semántico 1601b: ciclo mutuo entre macros (a <-> b)',
+        'codigo'       => "#definir(a) { base }\n#definir(b) { #imprimir(a) }\n#definir(a) { #imprimir(b) }",
+        'faseEsperada' => 'semantico',
+        'codigoEsp'    => 1601,
+    ],
+    [
         'nombre'       => 'Error semántico 1501: #referencia a etiqueta inexistente',
         'codigo'       => '#texto { Ver la #referencia(sec_inexistente). }',
         'faseEsperada' => 'semantico',

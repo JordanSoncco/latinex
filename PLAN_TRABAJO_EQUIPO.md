@@ -83,6 +83,7 @@ Para trabajar en paralelo hasta el 27 de noviembre sin pisarse archivos, cada in
 | :---: | :--- | :--- |
 | **`1500`** | Macro invocada en `#imprimir(id)` no registrada en `TablaSimbolos`. | `#texto { #imprimir(curso) }` sin `#definir(curso)` previo |
 | **`1600`** | Macro registrada (`#definir(id) { }`) pero vacía (`estado = 'no_asignado'`). | `#definir(curso) { } #texto { #imprimir(curso) }` |
+| **`1601`** | Recursión cíclica directa o mutua entre macros (`#definir` ↔ `#imprimir`). | `#definir(a){1} #definir(a){#imprimir(a)}` |
 | **`1501`** | `#referencia(id)` apunta a una etiqueta de sección inexistente. | `#texto { Ver #referencia(sec_faltante) }` |
 | **`1502`** | Etiqueta `id` duplicada en dos `#seccion` / `#subseccion*`. | `#seccion(id=s1){A} #seccion(id=s1){B}` |
 | **`1700`** | `#imagen` sin `ruta`, extensión distinta a `.jpg`/`.jpeg`, o `ancho`/`alto` inválido. | `#imagen(ancho=50%)` o `#imagen(ruta=foto.png)` |
@@ -161,35 +162,36 @@ Para trabajar en paralelo hasta el 27 de noviembre sin pisarse archivos, cada in
 
 | # | Caso de Prueba | Léxico | Sintáctico | Semántico | PDF Nativo (William) |
 | :-: | :--- | :---: | :---: | :---: | :---: |
-| 01 | Estructura de texto (`#texto`) | ✅ | ✅ | ✅ | ⏳ |
-| 02 | Formato negrita y cursiva (`#fuerte`, `#cursiva`) | ✅ | ✅ | ✅ | ⏳ |
-| 03 | Metadatos (`#titulo`, `#autor`) | ✅ | ✅ | ✅ | ⏳ |
-| 04 | Jerarquía estructural (`#seccion`..`#subseccion4`) | ✅ | ✅ | ✅ | ⏳ |
-| 05 | Salto de línea explícito (`#salto`) | ✅ | ✅ | ✅ | ⏳ |
-| 06 | Salto de página explícito (`#nuevapagina`) | ✅ | ✅ | ✅ | ⏳ |
-| 07 | Comentarios de línea (`//`) | ✅ | ✅ | ✅ | ⏳ |
-| 08 | Escape de caracteres (`\#`, `\{`, `\}`) | ✅ | ✅ | ✅ | ⏳ |
-| 09 | Alineación simple (`derecha`) | ✅ | ✅ | ✅ | ⏳ |
-| 10 | Alineación justificada (`justificado`) | ✅ | ✅ | ✅ | ⏳ |
-| 11 | Lista no ordenada con bloques anónimos (`#lista(punto)`) | ✅ | ✅ | ✅ | ⏳ |
-| 12 | Lista ordenada con bloques anónimos (`#lista(numero)`) | ✅ | ✅ | ✅ | ⏳ |
-| 13 | Uso de color `#RRGGBB` y `#resaltado` | ✅ | ✅ | ✅ | ⏳ |
-| 14 | Declaración de macros (`#definir`) | ✅ | ✅ | ✅ | ⏳ |
-| 15 | Invocación de macros (`#imprimir`) | ✅ | ✅ | ✅ | ⏳ |
-| 16 | Inserción de imágenes JPEG (`#imagen`) | ✅ | ✅ | ✅ | ⏳ |
-| 17 | Matemáticas en línea (`#superindice`, `#subindice`) | ✅ | ✅ | ✅ | ⏳ |
-| 18 | Entorno matemático (`#fraccion` con `{ }` y con atributos) | ✅ | ✅ | ✅ | ⏳ |
-| 19 | Atributos combinados complejos (`fuente`, `color`, `centrado`) | ✅ | ✅ | ✅ | ⏳ |
-| 20 | Salto de página automático (`Y_logica > 792 pt`) | ✅ | ✅ | ✅ | ⏳ |
-| 21 | Estructura base de tablas (`#tabla`, `#fila`, `#celda`) | ✅ | ✅ | ✅ | ⏳ |
-| 22 | Tablas completas (`bordes=verdadero`, `fondo=gris`) | ✅ | ✅ | ✅ | ⏳ |
-| 23 | Referencias cruzadas (`#seccion(id=...)` + `#referencia`) | ✅ | ✅ | ✅ | ⏳ |
-| 24 | Índice automático (`#indicegeneral`) | ✅ | ✅ | ✅ | ⏳ |
-| 25 | Anidamiento profundo 1 (`#lista` dentro de `#celda`) | ✅ | ✅ | ✅ | ⏳ |
-| 26 | Anidamiento profundo 2 (`StyleStack` colores y negrita) | ✅ | ✅ | ✅ | ⏳ |
-| 27 | Modo ecuación en bloque (`#ecuacion` numerada) | ✅ | ✅ | ✅ | ⏳ |
-| 28 | Cajas de advertencia con vectores PDF (`#caja`) | ✅ | ✅ | ✅ | ⏳ |
-| 29 | Prueba de estrés (documento académico integral) | ✅ | ✅ | ✅ | ⏳ |
+| 01 | Estructura de texto (`#texto`) | ✅ | ✅ | ✅ | ✅ |
+| 02 | Formato negrita y cursiva (`#fuerte`, `#cursiva`) | ✅ | ✅ | ✅ | ✅ |
+| 03 | Metadatos (`#titulo`, `#autor`) | ✅ | ✅ | ✅ | ✅ |
+| 04 | Jerarquía estructural (`#seccion`..`#subseccion4`) | ✅ | ✅ | ✅ | ✅ |
+| 05 | Salto de línea explícito (`#salto`) | ✅ | ✅ | ✅ | ✅ |
+| 06 | Salto de página explícito (`#nuevapagina`) | ✅ | ✅ | ✅ | ✅ |
+| 07 | Comentarios de línea (`//`) | ✅ | ✅ | ✅ | ✅ |
+| 08 | Escape de caracteres (`\#`, `\{`, `\}`) | ✅ | ✅ | ✅ | ✅ |
+| 09 | Alineación simple (`derecha`) | ✅ | ✅ | ✅ | ✅ |
+| 10 | Alineación justificada (`justificado`) | ✅ | ✅ | ✅ | ✅ |
+| 11 | Lista no ordenada con bloques anónimos (`#lista(punto)`) | ✅ | ✅ | ✅ | ✅ |
+| 12 | Lista ordenada con bloques anónimos (`#lista(numero)`) | ✅ | ✅ | ✅ | ✅ |
+| 13 | Uso de color `#RRGGBB` y `#resaltado` | ✅ | ✅ | ✅ | ✅ |
+| 14 | Declaración de macros (`#definir`) | ✅ | ✅ | ✅ | ✅ |
+| 15 | Invocación de macros (`#imprimir`) | ✅ | ✅ | ✅ | ✅ |
+| 16 | Inserción de imágenes JPEG (`#imagen`) | ✅ | ✅ | ✅ | ✅ |
+| 17 | Matemáticas en línea (`#superindice`, `#subindice`) | ✅ | ✅ | ✅ | ✅ |
+| 18 | Entorno matemático (`#fraccion` con `{ }` y con atributos) | ✅ | ✅ | ✅ | ✅ |
+| 19 | Atributos combinados complejos (`fuente`, `color`, `centrado`) | ✅ | ✅ | ✅ | ✅ |
+| 20 | Salto de página automático (`Y_logica > 792 pt`) | ✅ | ✅ | ✅ | ✅ |
+| 21 | Estructura base de tablas (`#tabla`, `#fila`, `#celda`) | ✅ | ✅ | ✅ | ✅ |
+| 22 | Tablas completas (`bordes=verdadero`, `fondo=gris`) | ✅ | ✅ | ✅ | ✅ |
+| 23 | Referencias cruzadas (`#seccion(id=...)` + `#referencia`) | ✅ | ✅ | ✅ | ✅ |
+| 24 | Índice automático (`#indicegeneral`) | ✅ | ✅ | ✅ | ✅ |
+| 25 | Anidamiento profundo 1 (`#lista` dentro de `#celda`) | ✅ | ✅ | ✅ | ✅ |
+| 26 | Anidamiento profundo 2 (`StyleStack` colores y negrita) | ✅ | ✅ | ✅ | ✅ |
+| 27 | Modo ecuación en bloque (`#ecuacion` numerada) | ✅ | ✅ | ✅ | ✅ |
+| 28 | Cajas de advertencia con vectores PDF (`#caja`) | ✅ | ✅ | ✅ | ✅ |
+| 29 | Prueba de estrés (documento académico integral) | ✅ | ✅ | ✅ | ✅ |
+| 30 | Notación griega y operadores científicos (`/Symbol` `/F7`) | ✅ | ✅ | ✅ | ✅ |
 
 ---
 

@@ -70,6 +70,16 @@ class Ejecutor
         'ñ' => 556, 'Á' => 667, 'É' => 667, 'Í' => 278, 'Ó' => 778, 'Ú' => 722,
         'Ü' => 722, 'Ñ' => 722, '¿' => 611, '¡' => 333, '•' => 350, '—' => 1000,
         '–' => 556, '«' => 556, '»' => 556, '°' => 400,
+        // Métricas AFM estándar de Adobe Symbol (1/1000 em) para medición exacta
+        'α' => 631, 'β' => 549, 'γ' => 411, 'δ' => 494, 'ε' => 439, 'ζ' => 494,
+        'η' => 603, 'θ' => 521, 'λ' => 549, 'μ' => 576, 'π' => 549, 'ρ' => 549,
+        'σ' => 603, 'τ' => 439, 'φ' => 521, 'ω' => 686, 'Γ' => 603, 'Δ' => 612,
+        'Θ' => 741, 'Λ' => 686, 'Π' => 768, 'Σ' => 592, 'Φ' => 763, 'Ψ' => 795,
+        'Ω' => 768, '∑' => 713, '∏' => 823, '∫' => 274, '√' => 549, '∞' => 713,
+        '≤' => 549, '≥' => 549, '≠' => 549, '≈' => 549, '≡' => 549, '±' => 549,
+        '∂' => 494, '∇' => 713, '∝' => 713, '∈' => 713, '∉' => 713, '∩' => 768,
+        '∪' => 768, '⊂' => 713, '⊆' => 713, '∀' => 713, '∃' => 549, '←' => 987,
+        '↑' => 603, '→' => 987, '↓' => 603, '↔' => 1042, '⇒' => 987, '⇔' => 1042,
     ];
 
     /** Anchos AFM estándar (en 1/1000 em) para Helvetica-Bold / BoldOblique */
@@ -94,6 +104,16 @@ class Ejecutor
         'ñ' => 611, 'Á' => 722, 'É' => 667, 'Í' => 278, 'Ó' => 778, 'Ú' => 722,
         'Ü' => 722, 'Ñ' => 722, '¿' => 611, '¡' => 333, '•' => 350, '—' => 1000,
         '–' => 556, '«' => 556, '»' => 556, '°' => 400,
+        // Métricas AFM estándar de Adobe Symbol (1/1000 em) para medición exacta
+        'α' => 631, 'β' => 549, 'γ' => 411, 'δ' => 494, 'ε' => 439, 'ζ' => 494,
+        'η' => 603, 'θ' => 521, 'λ' => 549, 'μ' => 576, 'π' => 549, 'ρ' => 549,
+        'σ' => 603, 'τ' => 439, 'φ' => 521, 'ω' => 686, 'Γ' => 603, 'Δ' => 612,
+        'Θ' => 741, 'Λ' => 686, 'Π' => 768, 'Σ' => 592, 'Φ' => 763, 'Ψ' => 795,
+        'Ω' => 768, '∑' => 713, '∏' => 823, '∫' => 274, '√' => 549, '∞' => 713,
+        '≤' => 549, '≥' => 549, '≠' => 549, '≈' => 549, '≡' => 549, '±' => 549,
+        '∂' => 494, '∇' => 713, '∝' => 713, '∈' => 713, '∉' => 713, '∩' => 768,
+        '∪' => 768, '⊂' => 713, '⊆' => 713, '∀' => 713, '∃' => 549, '←' => 987,
+        '↑' => 603, '→' => 987, '↓' => 603, '↔' => 1042, '⇒' => 987, '⇔' => 1042,
     ];
 
     /** Anchos AFM estándar (en 1/1000 em) para Times-Roman (/F6) */
@@ -152,8 +172,13 @@ class Ejecutor
 
     private int $contadorEcuacion = 0;
 
+    private const MAX_PROFUNDIDAD_MACRO = 16;
+
     /** @var array<string, array<int, array<string, mixed>>> Macros de nodos AST */
     private array $macrosNodos = [];
+
+    /** @var array<string, bool> Pila activa de macros en expansión para impedir recursión infinita */
+    private array $macrosEnExpansion = [];
 
     /** @var array<string, int> Mapa etiqueta -> número de página resuelto */
     private array $paginasEtiquetas = [];
@@ -220,7 +245,7 @@ class Ejecutor
         $this->ActualizarTablaSimbolosFinal();
         $this->totalPaginas = max(1, $this->paginaActual);
 
-        return true;
+        return $this->error === null;
     }
 
     /**
@@ -632,6 +657,7 @@ class Ejecutor
         $this->contadoresSeccion = [0, 0, 0, 0, 0];
         $this->contadorEcuacion  = 0;
         $this->macrosNodos       = [];
+        $this->macrosEnExpansion = [];
         $this->paginasEtiquetas  = [];
         $this->entradasIndice    = [];
 
@@ -675,8 +701,14 @@ class Ejecutor
 
             if ($tipoNodo === 'definir') {
                 $vaciarInline();
-                $this->macrosNodos[$nodo['id']] = $nodo['children'];
-                $valorPlano = trim($this->ExtraerTextoPlanoNodos($nodo['children']));
+                $macroDefId = (string) $nodo['id'];
+                $this->macrosNodos[$macroDefId] = $nodo['children'];
+                $this->macrosEnExpansion[$macroDefId] = true;
+                try {
+                    $valorPlano = trim($this->ExtraerTextoPlanoNodos($nodo['children']));
+                } finally {
+                    unset($this->macrosEnExpansion[$macroDefId]);
+                }
                 $tokDef     = $nodo['token'];
                 $estado     = $valorPlano !== '' ? 'asignado' : 'no_asignado';
                 if ($this->tablaSimbolos->Buscar($nodo['id'], 'MACRO') !== null) {
@@ -1062,22 +1094,50 @@ class Ejecutor
                     }
                 }
             } elseif ($tipo === 'imprimir') {
-                $hijosMacro = $this->macrosNodos[$nodo['id']] ?? [];
-                if (!empty($hijosMacro)) {
-                    $subPiezas = $this->AplanarInline($hijosMacro, $estiloBase);
-                    foreach ($subPiezas as $sp) {
-                        $piezas[] = $sp;
-                    }
+                $macroId = (string) $nodo['id'];
+                if (
+                    isset($this->macrosEnExpansion[$macroId])
+                    || count($this->macrosEnExpansion) >= self::MAX_PROFUNDIDAD_MACRO
+                ) {
+                    $this->error ??= [
+                        'tipo'        => 'ejecucion',
+                        'codigo'      => 1601,
+                        'token'       => $nodo['token']->token ?? T_IMPRIMIR,
+                        'nombreToken' => 'IMPRIMIR',
+                        'lexema'      => $macroId,
+                        'linea'       => $nodo['startLn'] ?? 1,
+                        'columna'     => $nodo['startCol'] ?? 1,
+                        'descripcion' => sprintf("Recursión cíclica o anidamiento excesivo al expandir la macro '%s'.", $macroId),
+                        'mensaje'     => sprintf(
+                            "Error 1601 (ejecución) en línea %d, columna %d: recursión cíclica al expandir la macro '%s'.",
+                            $nodo['startLn'] ?? 1,
+                            $nodo['startCol'] ?? 1,
+                            $macroId
+                        ),
+                    ];
                 } else {
-                    $sim = $this->tablaSimbolos->Buscar($nodo['id'], 'MACRO');
-                    $val = trim((string) ($sim['valor'] ?? ''));
-                    if ($val !== '') {
-                        $piezas[] = [
-                            'kind'  => 'word',
-                            'text'  => $val,
-                            'style' => $estiloBase,
-                            'width' => $this->MedirAnchoTexto($val, $estiloBase),
-                        ];
+                    $hijosMacro = $this->macrosNodos[$macroId] ?? [];
+                    if (!empty($hijosMacro)) {
+                        $this->macrosEnExpansion[$macroId] = true;
+                        try {
+                            $subPiezas = $this->AplanarInline($hijosMacro, $estiloBase);
+                        } finally {
+                            unset($this->macrosEnExpansion[$macroId]);
+                        }
+                        foreach ($subPiezas as $sp) {
+                            $piezas[] = $sp;
+                        }
+                    } else {
+                        $sim = $this->tablaSimbolos->Buscar($macroId, 'MACRO');
+                        $val = trim((string) ($sim['valor'] ?? ''));
+                        if ($val !== '') {
+                            $piezas[] = [
+                                'kind'  => 'word',
+                                'text'  => $val,
+                                'style' => $estiloBase,
+                                'width' => $this->MedirAnchoTexto($val, $estiloBase),
+                            ];
+                        }
                     }
                 }
             } elseif ($tipo === 'referencia') {
@@ -1166,25 +1226,38 @@ class Ejecutor
         $items = [];
         $clusterActual = [];
 
-        $cerrarCluster = static function () use (&$clusterActual, &$items): void {
+        $cerrarCluster = function () use (&$clusterActual, &$items, $anchoDisp): void {
             if (empty($clusterActual)) {
                 return;
             }
             $w = 0.0;
             $maxFont = 0.0;
+            $maxFracH = 0.0;
             $tieneFraccion = false;
             foreach ($clusterActual as $c) {
                 $w += $c['width'];
                 $maxFont = max($maxFont, (float) ($c['style']['size'] ?? 12.0));
                 if ($c['kind'] === 'fraccion') {
                     $tieneFraccion = true;
+                    $maxFracH = max($maxFracH, (float) ($c['height'] ?? 26.0));
                 }
             }
+
+            // Si una palabra/URL sin espacios supera el ancho útil de columna o celda, partirla limpiamente
+            if (!$tieneFraccion && $w > ($anchoDisp + 0.01) && count($clusterActual) === 1 && ($clusterActual[0]['kind'] ?? '') === 'word') {
+                foreach ($this->PartirPalabraAncha($clusterActual[0], $anchoDisp) as $subCluster) {
+                    $items[] = $subCluster;
+                }
+                $clusterActual = [];
+                return;
+            }
+
             $items[] = [
                 'type'          => 'cluster',
                 'parts'         => $clusterActual,
                 'width'         => $w,
                 'maxFont'       => $maxFont,
+                'maxFracHeight' => $maxFracH,
                 'tieneFraccion' => $tieneFraccion,
             ];
             $clusterActual = [];
@@ -1266,6 +1339,7 @@ class Ejecutor
             }
 
             $maxFont   = $estiloParrafo['size'];
+            $maxFracH  = 0.0;
             $tieneFrac = false;
             $numSpaces = 0;
 
@@ -1276,11 +1350,12 @@ class Ejecutor
                     $maxFont = max($maxFont, $li['maxFont']);
                     if ($li['tieneFraccion']) {
                         $tieneFrac = true;
+                        $maxFracH  = max($maxFracH, (float) ($li['maxFracHeight'] ?? 26.0));
                     }
                 }
             }
 
-            $altoLinea = $tieneFrac ? max($maxFont * 2.35, 28.0) : ($maxFont * 1.38);
+            $altoLinea = $tieneFrac ? max($maxFont * 2.35, 28.0, $maxFracH + 4.0) : ($maxFont * 1.38);
             $this->AsegurarEspacioVertical($altoLinea);
 
             $anchoLinea = $linea['width'];
@@ -1654,16 +1729,24 @@ class Ejecutor
         $denPiezas = $this->AplanarInline($nodoFrac['den'], $estiloSub);
 
         $anchoNum = 0.0;
+        $altoNum  = $estiloSub['size'] * 1.15;
         foreach ($numPiezas as $p) {
             $anchoNum += $p['width'];
+            if (($p['kind'] ?? '') === 'fraccion') {
+                $altoNum = max($altoNum, (float) ($p['height'] ?? 26.0));
+            }
         }
         $anchoDen = 0.0;
+        $altoDen  = $estiloSub['size'] * 1.15;
         foreach ($denPiezas as $p) {
             $anchoDen += $p['width'];
+            if (($p['kind'] ?? '') === 'fraccion') {
+                $altoDen = max($altoDen, (float) ($p['height'] ?? 26.0));
+            }
         }
 
         $anchoBarra = max($anchoNum, $anchoDen, 12.0) + 10.0;
-        $altoTotal  = max(26.0, $estiloSub['size'] * 2.55);
+        $altoTotal  = max(26.0, $estiloSub['size'] * 2.55, $altoNum + $altoDen + 8.0);
 
         return [
             'estilo'    => $estiloSub,
@@ -1671,6 +1754,8 @@ class Ejecutor
             'denPiezas' => $denPiezas,
             'anchoNum'  => $anchoNum,
             'anchoDen'  => $anchoDen,
+            'altoNum'   => $altoNum,
+            'altoDen'   => $altoDen,
             'ancho'     => $anchoBarra,
             'alto'      => $altoTotal,
         ];
@@ -1685,9 +1770,13 @@ class Ejecutor
     {
         $anchoBarra = $medida['ancho'];
         $estiloSub  = $medida['estilo'];
+        $altoNum    = (float) ($medida['altoNum'] ?? ($estiloSub['size'] * 1.15));
+        $altoDen    = (float) ($medida['altoDen'] ?? ($estiloSub['size'] * 1.15));
 
         $xNum      = $x + ($anchoBarra - $medida['anchoNum']) / 2.0;
-        $yBaseNum  = $yAxis - 4.2;
+        $yBaseNum  = $altoNum > ($estiloSub['size'] * 1.3)
+            ? ($yAxis - ($altoNum * 0.45) - 2.0)
+            : ($yAxis - 4.2);
         $this->DibujarSecuenciaPiezasLineal($medida['numPiezas'], $xNum, $yBaseNum, $pagina);
 
         $this->EmitirLinea(
@@ -1701,7 +1790,9 @@ class Ejecutor
         );
 
         $xDen     = $x + ($anchoBarra - $medida['anchoDen']) / 2.0;
-        $yBaseDen = $yAxis + $estiloSub['size'] + 2.2;
+        $yBaseDen = $altoDen > ($estiloSub['size'] * 1.3)
+            ? ($yAxis + ($altoDen * 0.58) + 2.0)
+            : ($yAxis + $estiloSub['size'] + 2.2);
         $this->DibujarSecuenciaPiezasLineal($medida['denPiezas'], $xDen, $yBaseDen, $pagina);
     }
 
@@ -1800,16 +1891,18 @@ class Ejecutor
         $estiloEc = $this->AplicarAtributosAEstilo($this->EstiloActual(), $nodoEc['attrs'], false);
         $piezas   = $this->AplanarInline($nodoEc['children'], $estiloEc);
 
-        $anchoTotal = 0.0;
-        $tieneFrac  = false;
+        $anchoTotal  = 0.0;
+        $tieneFrac   = false;
+        $maxAltoFrac = 0.0;
         foreach ($piezas as $p) {
             $anchoTotal += $p['width'];
             if ($p['kind'] === 'fraccion') {
-                $tieneFrac = true;
+                $tieneFrac   = true;
+                $maxAltoFrac = max($maxAltoFrac, (float) ($p['height'] ?? 26.0));
             }
         }
 
-        $altoBloque = $tieneFrac ? 36.0 : ($estiloEc['size'] * 1.8);
+        $altoBloque = $tieneFrac ? max(36.0, $maxAltoFrac + 10.0) : ($estiloEc['size'] * 1.8);
         $this->yLogica += 8.0; // margen superior adicional (+10 pt nominal)
         $this->AsegurarEspacioVertical($altoBloque + 8.0);
 
@@ -2650,5 +2743,65 @@ class Ejecutor
     private function ExtraerPaginasIndice(array $lista): array
     {
         return array_map(fn(array $e): int => $e['pagina'], $lista);
+    }
+
+    /**
+     * Parte una palabra/URL individual más ancha que $anchoDisp en sub-clusters ajustados.
+     *
+     * @param array<string, mixed> $piezaWord
+     * @return array<int, array<string, mixed>>
+     */
+    private function PartirPalabraAncha(array $piezaWord, float $anchoDisp): array
+    {
+        $estilo   = $piezaWord['style'];
+        $maxAncho = max(12.0, $anchoDisp);
+        $chars    = mb_str_split((string) $piezaWord['text'], 1, 'UTF-8');
+        $trozos   = [];
+        $buf      = '';
+        $wBuf     = 0.0;
+
+        foreach ($chars as $ch) {
+            $wCh = $this->MedirAnchoTexto($ch, $estilo);
+            if ($buf !== '' && ($wBuf + $wCh) > $maxAncho) {
+                $piezaSub = [
+                    'kind'  => 'word',
+                    'text'  => $buf,
+                    'style' => $estilo,
+                    'width' => $wBuf,
+                ];
+                $trozos[] = [
+                    'type'          => 'cluster',
+                    'parts'         => [$piezaSub],
+                    'width'         => $wBuf,
+                    'maxFont'       => (float) ($estilo['size'] ?? 12.0),
+                    'maxFracHeight' => 0.0,
+                    'tieneFraccion' => false,
+                ];
+                $buf  = $ch;
+                $wBuf = $wCh;
+            } else {
+                $buf  .= $ch;
+                $wBuf += $wCh;
+            }
+        }
+
+        if ($buf !== '') {
+            $piezaSub = [
+                'kind'  => 'word',
+                'text'  => $buf,
+                'style' => $estilo,
+                'width' => $wBuf,
+            ];
+            $trozos[] = [
+                'type'          => 'cluster',
+                'parts'         => [$piezaSub],
+                'width'         => $wBuf,
+                'maxFont'       => (float) ($estilo['size'] ?? 12.0),
+                'maxFracHeight' => 0.0,
+                'tieneFraccion' => false,
+            ];
+        }
+
+        return $trozos;
     }
 }

@@ -28,9 +28,12 @@ namespace Latinex;
 class Tokenizador
 {
     private string     $codigo;
-    private int        $indice  = 0;
-    private int        $linea   = 1;
-    private int        $columna = 1;
+    /** @var string[] Arreglo indexado O(1) de caracteres UTF-8 */
+    private array      $caracteres = [];
+    private int        $longitud   = 0;
+    private int        $indice     = 0;
+    private int        $linea      = 1;
+    private int        $columna    = 1;
     private TablaLexica $tablaLexica;
 
     /** Nivel de anidamiento de paréntesis — activa modo ATRIBUTOS */
@@ -41,6 +44,8 @@ class Tokenizador
     public function __construct(string $codigo, TablaLexica $tablaLexica)
     {
         $this->codigo      = $codigo;
+        $this->caracteres  = $codigo === '' ? [] : mb_str_split($codigo, 1, 'UTF-8');
+        $this->longitud    = count($this->caracteres);
         $this->tablaLexica = $tablaLexica;
     }
 
@@ -352,14 +357,22 @@ class Tokenizador
         return null; // cadena sin cerrar
     }
 
-    /** Lee texto plano hasta encontrar #, {, }, // o \ */
+    /** Lee texto plano hasta encontrar #, {, }, // o \ (preservando esquemas URL como https://) */
     private function LeerTextoPlano(): string
     {
         $lexema = '';
         while (!$this->FinCodigo()) {
             $car = $this->charActual();
             if ($car === '#' || $car === '{' || $car === '}' || $car === '\\') break;
-            if ($car === '/' && $this->mirarAdelante() === '/') break;
+            if ($car === '/' && $this->mirarAdelante() === '/') {
+                if (str_ends_with($lexema, ':')) {
+                    $lexema .= '//';
+                    $this->Avanzar();
+                    $this->Avanzar();
+                    continue;
+                }
+                break;
+            }
             $lexema .= $car;
             $this->Avanzar();
         }
@@ -371,16 +384,16 @@ class Tokenizador
     {
         if ($this->charActual() !== '#') return false;
         $pos   = $this->indice + 1;
-        $total = mb_strlen($this->codigo, 'UTF-8');
+        $total = $this->longitud;
         $count = 0;
         while ($pos < $total && $count < 6) {
-            $c = mb_substr($this->codigo, $pos, 1, 'UTF-8');
+            $c = $this->caracteres[$pos];
             if (ctype_xdigit($c)) { $count++; $pos++; } else break;
         }
         if ($count !== 3 && $count !== 6) return false;
         // No debe seguir una letra no-hex (sería nombre de comando)
         if ($pos < $total) {
-            $sig = mb_substr($this->codigo, $pos, 1, 'UTF-8');
+            $sig = $this->caracteres[$pos];
             if ($this->esLetra($sig) && !ctype_xdigit($sig)) return false;
         }
         return true;
@@ -411,20 +424,18 @@ class Tokenizador
 
     private function charActual(): string
     {
-        return mb_substr($this->codigo, $this->indice, 1, 'UTF-8');
+        return $this->caracteres[$this->indice] ?? '';
     }
 
     private function mirarAdelante(): string
     {
-        $pos = $this->indice + 1;
-        if ($pos >= mb_strlen($this->codigo, 'UTF-8')) return '';
-        return mb_substr($this->codigo, $pos, 1, 'UTF-8');
+        return $this->caracteres[$this->indice + 1] ?? '';
     }
 
     private function Avanzar(): void
     {
-        if ($this->FinCodigo()) return;
-        if ($this->charActual() === "\n") {
+        if ($this->indice >= $this->longitud) return;
+        if ($this->caracteres[$this->indice] === "\n") {
             $this->linea++;
             $this->columna = 1;
         } else {
@@ -435,11 +446,15 @@ class Tokenizador
 
     private function FinCodigo(): bool
     {
-        return $this->indice >= mb_strlen($this->codigo, 'UTF-8');
+        return $this->indice >= $this->longitud;
     }
 
     private function esLetra(string $c): bool
     {
+        if ($c === '') return false;
+        if (ord($c) < 128) {
+            return ctype_alpha($c);
+        }
         return preg_match('/\p{L}/u', $c) === 1;
     }
 

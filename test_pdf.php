@@ -298,6 +298,14 @@ $casos = [
         'codigo' => "// Documento integral\n#definir(version) { 1.0 }\n#titulo(color=#0000FF) { Manual del Compilador }\n#autor { Equipo de Compiladores }\n#indicegeneral\n#seccion(id=intro) { Uso en versión #imprimir(version) }\n#texto(justificado) {\n    Pruebas integrales del #fuerte(color=#FF0000){lenguaje de marcado} descrito en la página #referencia(intro).\n}",
         'check'  => fn(array $r): bool => str_contains($r['pdf'], '/Title (Manual del Compilador)') && str_contains($r['pdf'], '(lenguaje de marcado) Tj') && str_contains($r['pdf'], '1.0'),
     ],
+    [
+        'nombre' => 'Caso 30: Símbolos Griegos y Matemáticos (/Symbol + Pie de página)',
+        'codigo' => "#titulo { Cálculo Científico }\n#texto { Área = π r#superindice{2}, límite → ∞ y suma ∑ ≤ 1. }\n#ecuacion { ∫ f(x) dx ≠ 0 }",
+        'check'  => fn(array $r): bool => str_contains($r['pdf'], '/BaseFont /Symbol')
+            && str_contains($r['pdf'], '/F7 ')
+            && str_contains($r['pdf'], "P\xE1gina 1 de 1")
+            && !str_contains($r['pdf'], '= ?'),
+    ],
 ];
 
 echo "=========================================================================\n";

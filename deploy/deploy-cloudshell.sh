@@ -184,6 +184,8 @@ cmds = [
     "cd /opt/latinex && docker compose exec -T app php -v",
     "cd /opt/latinex && docker compose exec -T app php test_lexico.php",
     "cd /opt/latinex && docker compose exec -T app php test_frente1.php",
+    "cd /opt/latinex && docker compose exec -T app php test_pdf.php",
+    "cd /opt/latinex && docker compose exec -T app php test_e2e.php",
     "cd /opt/latinex && docker compose exec -T app php test_auth_proyectos.php",
 ]
 print(json.dumps({"commands": cmds}))

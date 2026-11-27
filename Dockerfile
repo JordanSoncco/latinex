@@ -16,7 +16,8 @@ WORKDIR /var/www/html
 
 COPY --chown=www-data:www-data . /var/www/html
 
-RUN mkdir -p /var/www/html/storage/proyectos /var/www/html/temp_uploads \
+RUN mkdir -p /var/www/html/storage/proyectos /var/www/html/storage/sesiones /var/www/html/temp_uploads \
+    && chmod 700 /var/www/html/storage/sesiones \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/temp_uploads
 
 USER www-data

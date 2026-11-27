@@ -30,6 +30,9 @@ class AnalizadorSemantico
     /** @var array<int, string> */
     private array $advertencias = [];
 
+    /** @var array<string, string[]> Grafo de dependencias entre macros (#definir -> #imprimir) */
+    private array $dependenciasMacros = [];
+
     private const TOKENS_SECCION = [
         T_SECCION,
         T_SUBSECCION,
@@ -66,8 +69,9 @@ class AnalizadorSemantico
     /** Ejecuta el análisis semántico en dos pasadas internas. */
     public function Analizar(): bool
     {
-        $this->error        = null;
-        $this->advertencias = [];
+        $this->error              = null;
+        $this->advertencias       = [];
+        $this->dependenciasMacros = [];
 
         $tokens = $this->LeerFlujoTokens();
         if ($tokens === null) {
@@ -293,6 +297,32 @@ class AnalizadorSemantico
         }
 
         $cierre = $this->EncontrarLlaveCierre($tokens, $pos);
+
+        // Detectar autorreferencia o ciclos indirectos (ej. a -> a, o a -> b -> a)
+        $invocadas = [];
+        for ($k = $pos + 1; $k < $cierre; $k++) {
+            if ($tokens[$k]->token === T_IMPRIMIR && isset($tokens[$k + 2])) {
+                $depTok = $tokens[$k + 2];
+                $depId  = trim((string) $depTok->lexema);
+                if ($depId !== '') {
+                    if ($depId === $nombreMacro || $this->AlcanzaMacro($depId, $nombreMacro)) {
+                        $this->error = $this->CrearError(
+                            1601,
+                            $depTok,
+                            sprintf(
+                                "Recursión cíclica detectada en la macro '%s' al invocar '#imprimir(%s)'.",
+                                $nombreMacro,
+                                $depId
+                            )
+                        );
+                        return -1;
+                    }
+                    $invocadas[$depId] = true;
+                }
+            }
+        }
+        $this->dependenciasMacros[$nombreMacro] = array_keys($invocadas);
+
         $valor  = $this->ExtraerTextoPlanoRango($tokens, $pos + 1, $cierre - 1);
 
         if ($valor === '') {
@@ -325,6 +355,32 @@ class AnalizadorSemantico
 
         // Entrar al cuerpo '{' para validar posibles comandos anidados en su interior
         return $pos + 1;
+    }
+
+    /** Verifica mediante búsqueda en grafo si $origen depende directa o indirectamente de $objetivo. */
+    private function AlcanzaMacro(string $origen, string $objetivo): bool
+    {
+        $visitados = [];
+        $cola      = [$origen];
+
+        while (!empty($cola)) {
+            $actual = array_shift($cola);
+            if ($actual === $objetivo) {
+                return true;
+            }
+            if (isset($visitados[$actual])) {
+                continue;
+            }
+            $visitados[$actual] = true;
+
+            foreach ($this->dependenciasMacros[$actual] ?? [] as $sig) {
+                if (!isset($visitados[$sig])) {
+                    $cola[] = $sig;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function ProcesarImprimir(array $tokens, int $idx): int
@@ -438,7 +494,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, true)) {
             return -1;
         }
 
@@ -530,7 +586,7 @@ class AnalizadorSemantico
         $pos       = $idx + 1;
         $atributos = $this->LeerAtributos($tokens, $pos);
 
-        if (!$this->ValidarAtributosComunes($atributos)) {
+        if (!$this->ValidarAtributosComunes($atributos, true)) {
             return -1;
         }
 
@@ -619,7 +675,7 @@ class AnalizadorSemantico
      *
      * @param array<int, array{claveToken: ?int, clave: ?string, valores: Token[]}> $atributos
      */
-    private function ValidarAtributosComunes(array $atributos): bool
+    private function ValidarAtributosComunes(array $atributos, bool $permitirBanderasEspeciales = false): bool
     {
         foreach ($atributos as $attr) {
             $claveToken = $attr['claveToken'];
@@ -630,6 +686,27 @@ class AnalizadorSemantico
             }
 
             $primerValor = $valores[0];
+
+            // Banderas posicionales fuera de contexto (p. ej. #texto(alerta) o #texto(punto))
+            if ($claveToken === null) {
+                if (!$permitirBanderasEspeciales && !in_array($primerValor->token, self::ALINEACIONES_VALIDAS, true)) {
+                    $this->advertencias[] = sprintf(
+                        "La bandera posicional '%s' (línea %d) no aplica a este comando y será ignorada.",
+                        (string) $primerValor->lexema,
+                        $primerValor->linea
+                    );
+                }
+                continue;
+            }
+
+            // Advertir atributos desconocidos (typos como alineasion=...) sin romper compilación
+            if ($claveToken === T_ID) {
+                $this->advertencias[] = sprintf(
+                    "El atributo '%s' no pertenece al catálogo oficial de LATINEX y será ignorado.",
+                    (string) $attr['clave']
+                );
+                continue;
+            }
 
             // Color o fondo (#RRGGBB / #RGB o color reservado)
             if ($claveToken === T_ATTR_COLOR || $claveToken === T_ATTR_FONDO) {
