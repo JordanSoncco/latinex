@@ -4,78 +4,72 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
-  <title>LATINEX Cloud — Editor Tipo Overleaf y Compilador Nativo a PDF</title>
+  <title>LATINEX Cloud — Entorno Profesional de Composición a PDF</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
   <div id="app" v-cloak class="app-shell">
-    <!-- Barra superior estilo Overleaf -->
+    <!-- Barra superior única estilo Overleaf Pro (1 sola fila en escritorio) -->
     <header class="topbar">
       <div class="topbar-left">
         <button
           type="button"
-          class="btn btn-outline btn-icon"
+          class="btn btn-ghost btn-icon"
           :aria-expanded="sidebarOpen ? 'true' : 'false'"
           aria-controls="projects-sidebar"
           @click="sidebarOpen = !sidebarOpen"
-          title="Mostrar u ocultar panel de documentos">
-          ☰
+          title="Mostrar u ocultar árbol de archivos y esquema">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M3 6h18M3 12h18M3 18h18"/>
+          </svg>
         </button>
 
         <div class="brand">
-          <span class="brand-logo" aria-hidden="true">Lx</span>
-          <h1 class="brand-name">LATINEX Cloud</h1>
-          <span class="brand-pill">PHP 8.5 · Nativo PDF</span>
+          <!-- Logo vectorial estilo Overleaf (hoja/pluma académica + monograma Lx) -->
+          <svg class="brand-emblem" width="28" height="28" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="lxGrad" x1="2" y1="2" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#10b981"/>
+                <stop offset="55%" stop-color="#059669"/>
+                <stop offset="100%" stop-color="#2563eb"/>
+              </linearGradient>
+            </defs>
+            <rect x="2" y="2" width="32" height="32" rx="8.5" fill="url(#lxGrad)"/>
+            <path d="M27.5 8.5C19.5 8.8 12.2 13.4 9.5 21.8C13.2 19.8 16.8 19.6 20.6 20.5C24.8 16.8 27.1 12.6 27.5 8.5Z" fill="rgba(255,255,255,0.22)"/>
+            <text x="18" y="24.2" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-weight="800" font-size="14.5" letter-spacing="-0.8">Lx</text>
+          </svg>
+          <div class="brand-text">
+            <span class="brand-name">LATINEX</span>
+            <span class="brand-sub">Studio</span>
+          </div>
         </div>
 
         <div class="doc-status-group">
-          <span class="active-file-chip" :title="activeFilename">{{ activeFilename }}</span>
-          <span v-if="user && saveState === 'saved'" class="save-pill saved">Guardado</span>
-          <span v-else-if="user && saveState === 'saving'" class="save-pill guest">Guardando...</span>
-          <span v-else-if="user && saveState === 'dirty'" class="save-pill dirty">Sin guardar</span>
-          <span v-else class="save-pill guest">Modo Invitado</span>
+          <span class="active-file-chip" :title="activeFilename">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span>{{ activeFilename }}</span>
+          </span>
+          <span v-if="user && saveState === 'saved'" class="save-pill saved">✓ Guardado</span>
+          <span v-else-if="user && saveState === 'saving'" class="save-pill guest">⟳ Guardando...</span>
+          <span v-else-if="user && saveState === 'dirty'" class="save-pill dirty">● Sin guardar</span>
+          <span v-else class="save-pill guest">⚡ Invitado</span>
         </div>
       </div>
 
       <div class="topbar-center">
-        <button
-          type="button"
-          class="btn btn-compile"
-          :disabled="isCompiling"
-          @click="compilar"
-          title="Compilar documento (Ctrl+Enter)">
-          {{ isCompiling ? 'Compilando...' : '▶ Compilar' }}
-        </button>
-
-        <button
-          v-if="user && activeDoc"
-          type="button"
-          class="btn btn-outline"
-          :disabled="isSaving || saveState === 'saving'"
-          @click="guardarDocumentoActual(true)"
-          title="Guardar en el servidor (Ctrl+S)">
-          Guardar
-        </button>
-
-        <button
-          type="button"
-          class="btn btn-outline"
-          :disabled="!pdfDownloadBase64"
-          @click="descargarPdf"
-          title="Descargar archivo .pdf nativo">
-          Descargar PDF
-        </button>
-
         <select
           class="select-control"
           v-model="selectedCaseKey"
           @change="cargarCasoSeleccionado"
           aria-label="Cargar caso de prueba o plantilla">
-          <option value="">📂 Cargar Caso (01–29)...</option>
+          <option value="">📂 Casos de Prueba (01–29)...</option>
           <option v-for="c in casosDePrueba" :key="c.key" :value="c.key">
             {{ c.label }}
           </option>
@@ -83,171 +77,292 @@
 
         <button
           type="button"
-          class="btn btn-outline"
+          class="btn btn-outline btn-sm"
           @click="abrirTablaLexicaOficial"
-          title="Inspeccionar las 78 entradas léxicas oficiales">
-          Tabla Léxica (78)
+          title="Explorar especificación oficial de tokens">
+          Tabla Léxica ({{ lexicalCount }})
+        </button>
+
+        <button
+          v-if="user && activeDoc"
+          type="button"
+          class="btn btn-outline btn-sm"
+          :disabled="isSaving || saveState === 'saving'"
+          @click="guardarDocumentoActual(true)"
+          title="Guardar en el servidor (Ctrl+S)">
+          Guardar
         </button>
       </div>
 
       <div class="topbar-right">
         <div v-if="user" class="user-chip">
-          <span>{{ user.nombre }}</span>
+          <span class="user-name">{{ user.nombre }}</span>
           <span class="user-quota-pill">{{ quota.usados }}/{{ quota.maximo }} .ltx</span>
-          <button type="button" class="btn btn-outline btn-sm" @click="cerrarSesion">
+          <button type="button" class="btn btn-ghost btn-sm" @click="cerrarSesion">
             Salir
           </button>
         </div>
-        <div v-else class="topbar-right">
-          <button type="button" class="btn btn-outline" @click="abrirAuthDialog('login')">
+        <div v-else class="auth-actions">
+          <button type="button" class="btn btn-outline btn-sm" @click="abrirAuthDialog('login')">
             Iniciar sesión
           </button>
-          <button type="button" class="btn" @click="abrirAuthDialog('register')">
+          <button type="button" class="btn btn-sm" @click="abrirAuthDialog('register')">
             Crear perfil
           </button>
         </div>
       </div>
     </header>
 
-    <!-- Barra rápida intuitiva para insertar comandos LATINEX -->
-    <nav class="snippet-ribbon" aria-label="Inserción rápida de comandos LATINEX">
-      <span class="snippet-label">Insertar rápido:</span>
-      <button
-        v-for="item in quickSnippets"
-        :key="item.label"
-        type="button"
-        class="snippet-btn"
-        :title="item.desc"
-        @click="insertarSnippet(item.code)">
-        {{ item.label }}
-      </button>
-    </nav>
-
-    <!-- Área principal de 3 paneles -->
+    <!-- Área principal estilo Overleaf: Sidebar + Editor + Divisor SyncTeX + Visor A4 -->
     <main class="workbench" :class="{ 'sidebar-collapsed': !sidebarOpen }">
-      <!-- Panel Izquierdo: Mis Documentos (.ltx) e Imágenes -->
-      <aside v-show="sidebarOpen" id="projects-sidebar" class="sidebar" aria-label="Archivos del proyecto">
-        <section v-if="user" class="sidebar-section">
-          <div class="sidebar-header">
-            <h2 class="sidebar-title">Mis Documentos</h2>
-            <button
-              type="button"
-              class="btn btn-sm"
-              :disabled="quota.usados >= quota.maximo"
-              :title="quota.usados >= quota.maximo ? 'Límite de 10 documentos alcanzado' : 'Crear nuevo archivo .ltx'"
-              @click="abrirNuevoDocDialog">
-              + Nuevo .ltx
-            </button>
-          </div>
-
-          <div class="quota-box">
-            <div class="quota-row">
-              <span>Capacidad del prototipo</span>
-              <strong>{{ quota.usados }} / {{ quota.maximo }}</strong>
-            </div>
-            <progress class="quota-progress" :value="quota.usados" :max="quota.maximo"></progress>
-          </div>
-
-          <ul class="doc-list">
-            <li
-              v-for="doc in documents"
-              :key="doc.id"
-              class="doc-item"
-              :class="{ active: activeDoc && activeDoc.id === doc.id }">
+      <!-- Panel Izquierdo: Árbol de Archivos + Esquema del Documento (File outline) -->
+      <aside v-show="sidebarOpen" id="projects-sidebar" class="sidebar" aria-label="Archivos y esquema del documento">
+        <div class="sidebar-top-scroll">
+          <section v-if="user" class="sidebar-section">
+            <div class="sidebar-header">
+              <h2 class="sidebar-title">Árbol de Archivos</h2>
               <button
                 type="button"
-                class="doc-select-btn"
-                @click="seleccionarDocumento(doc.id)">
-                <span class="doc-item-title">{{ doc.titulo }}</span>
-                <span class="doc-item-meta">{{ doc.nombre_archivo }} · {{ doc.bytes_tamano }} B</span>
+                class="btn btn-sm"
+                :disabled="quota.usados >= quota.maximo"
+                :title="quota.usados >= quota.maximo ? 'Límite de 10 documentos alcanzado' : 'Crear nuevo archivo .ltx'"
+                @click="abrirNuevoDocDialog">
+                + Nuevo
               </button>
-              <div class="doc-item-actions">
+            </div>
+
+            <div class="quota-box">
+              <div class="quota-row">
+                <span>Documentos en nube</span>
+                <strong>{{ quota.usados }} / {{ quota.maximo }}</strong>
+              </div>
+              <progress class="quota-progress" :value="quota.usados" :max="quota.maximo"></progress>
+            </div>
+
+            <ul class="doc-list">
+              <li
+                v-for="doc in documents"
+                :key="doc.id"
+                class="doc-item"
+                :class="{ active: activeDoc && activeDoc.id === doc.id }">
                 <button
                   type="button"
-                  class="mini-action-btn"
-                  title="Renombrar archivo"
-                  @click="abrirRenombrarDialog(doc)">
-                  ✎
+                  class="doc-select-btn"
+                  @click="seleccionarDocumento(doc.id)">
+                  <span class="doc-item-title">{{ doc.titulo }}</span>
+                  <span class="doc-item-meta">{{ doc.nombre_archivo }} · {{ doc.bytes_tamano }} B</span>
+                </button>
+                <div class="doc-item-actions">
+                  <button
+                    type="button"
+                    class="mini-action-btn"
+                    title="Renombrar archivo"
+                    @click="abrirRenombrarDialog(doc)">
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    class="mini-action-btn danger"
+                    title="Eliminar documento"
+                    @click="abrirEliminarDialog(doc)">
+                    ✕
+                  </button>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <section v-else class="guest-card">
+            <div class="guest-card-head">
+              <strong>Modo Invitado Activo</strong>
+            </div>
+            <span>Edita y compila al instante; tu avance se conserva en este navegador.</span>
+            <span>Guarda hasta <strong>10 proyectos .ltx</strong> en AWS creando tu cuenta gratuita.</span>
+            <button type="button" class="btn btn-sm" @click="abrirAuthDialog('register')">
+              Guardar en la nube
+            </button>
+          </section>
+
+          <!-- Imágenes adjuntas -->
+          <section class="sidebar-section">
+            <div class="sidebar-header">
+              <h2 class="sidebar-title">Recursos (.jpg)</h2>
+              <span v-if="user && activeDoc" class="save-pill guest">{{ activeImages.length }}/5</span>
+            </div>
+
+            <label class="image-upload-label">
+              <span>{{ user && activeDoc ? '+ Subir .jpg al proyecto' : '+ Adjuntar .jpg local' }}</span>
+              <input type="file" accept=".jpg,.jpeg,image/jpeg" :multiple="!user" @change="subirImagen">
+            </label>
+
+            <div v-if="user && activeDoc" class="asset-list">
+              <div v-for="img in activeImages" :key="img.id" class="asset-row">
+                <button
+                  type="button"
+                  class="asset-insert-btn"
+                  title="Insertar #imagen(...) en el cursor"
+                  @click="insertarSnippet(`\n#imagen(ruta=${img.nombre_archivo}, ancho=60%, alto=auto, alineacion=centro)\n`)">
+                  🖼 {{ img.nombre_archivo }}
                 </button>
                 <button
                   type="button"
                   class="mini-action-btn danger"
-                  title="Eliminar documento"
-                  @click="abrirEliminarDialog(doc)">
+                  title="Quitar imagen"
+                  @click="eliminarImagenDocumento(img.id)">
                   ✕
                 </button>
               </div>
+            </div>
+
+            <div v-else class="asset-list">
+              <div v-for="(img, idx) in guestImages" :key="idx" class="asset-row">
+                <button
+                  type="button"
+                  class="asset-insert-btn"
+                  @click="insertarSnippet(`\n#imagen(ruta=${img.name}, ancho=60%, alto=auto, alineacion=centro)\n`)">
+                  🖼 {{ img.name }}
+                </button>
+                <button type="button" class="mini-action-btn danger" @click="guestImages.splice(idx, 1)">✕</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Esquema del documento en vivo (igual que File outline de Overleaf) -->
+        <section class="sidebar-outline">
+          <div class="sidebar-header">
+            <h2 class="sidebar-title">Esquema del Documento</h2>
+            <span class="outline-count">{{ documentOutline.length }}</span>
+          </div>
+
+          <ul v-if="documentOutline.length > 0" class="outline-list">
+            <li v-for="(item, idx) in documentOutline" :key="idx">
+              <button
+                type="button"
+                class="outline-btn"
+                :class="[`level-${item.level}`, { current: cursorLn === item.line }]"
+                @click="saltarAEsquema(item)"
+                :title="`Ir a línea ${item.line}`">
+                <span class="outline-tag">{{ item.badge }}</span>
+                <span class="outline-label">{{ item.title }}</span>
+                <span class="outline-ln">:{{ item.line }}</span>
+              </button>
             </li>
           </ul>
-        </section>
-
-        <section v-else class="guest-card">
-          <strong>Modo Invitado (Demo instantánea)</strong>
-          <span>Edita y compila sin registrarte; tu borrador actual se guarda localmente en este navegador.</span>
-          <span>Para guardar y continuar hasta <strong>10 archivos .ltx</strong> en el servidor AWS, inicia sesión o crea tu perfil.</span>
-          <button type="button" class="btn btn-sm" @click="abrirAuthDialog('register')">
-            Registrarme y guardar en la nube
-          </button>
-        </section>
-
-        <!-- Imágenes adjuntas -->
-        <section class="sidebar-section">
-          <div class="sidebar-header">
-            <h2 class="sidebar-title">Imágenes (.jpg)</h2>
-            <span v-if="user && activeDoc" class="save-pill guest">{{ activeImages.length }}/5</span>
-          </div>
-
-          <label class="image-upload-label">
-            <span>{{ user && activeDoc ? '+ Subir .jpg al documento' : '+ Adjuntar .jpg efímera' }}</span>
-            <input type="file" accept=".jpg,.jpeg,image/jpeg" :multiple="!user" @change="subirImagen">
-          </label>
-
-          <div v-if="user && activeDoc" class="asset-list">
-            <div v-for="img in activeImages" :key="img.id" class="asset-row">
-              <button
-                type="button"
-                class="asset-insert-btn"
-                title="Insertar #imagen(...) en el cursor"
-                @click="insertarSnippet(`\n#imagen(ruta=${img.nombre_archivo}, ancho=60%, alto=auto, alineacion=centro)\n`)">
-                {{ img.nombre_archivo }}
-              </button>
-              <button
-                type="button"
-                class="mini-action-btn danger"
-                title="Quitar imagen"
-                @click="eliminarImagenDocumento(img.id)">
-                ✕
-              </button>
-            </div>
-          </div>
-
-          <div v-else class="asset-list">
-            <div v-for="(img, idx) in guestImages" :key="idx" class="asset-row">
-              <button
-                type="button"
-                class="asset-insert-btn"
-                @click="insertarSnippet(`\n#imagen(ruta=${img.name}, ancho=60%, alto=auto, alineacion=centro)\n`)">
-                {{ img.name }}
-              </button>
-              <button type="button" class="mini-action-btn danger" @click="guestImages.splice(idx, 1)">✕</button>
-            </div>
-          </div>
+          <p v-else class="outline-empty">
+            Añade <code>#titulo</code> o <code>#seccion</code> para navegar la estructura aquí.
+          </p>
         </section>
       </aside>
 
-      <!-- Panel Central: Editor con numeración de líneas -->
+      <!-- Panel Central: Editor .ltx con barra de formato Overleaf, Undo/Redo y Rueda de Color -->
       <section class="editor-pane" aria-label="Editor de código fuente LATINEX">
-        <div class="pane-subheader">
-          <span>Editor Fuente (.ltx)</span>
-          <span>Atajos: Ctrl+Enter compila <template v-if="user">· Ctrl+S guarda</template></span>
+        <div class="editor-toolbar">
+          <div class="toolbar-group">
+            <button
+              type="button"
+              class="tool-btn"
+              :disabled="!canUndo"
+              @click="deshacer"
+              title="Deshacer cambio (Ctrl+Z)"
+              aria-label="Deshacer">
+              ↶
+            </button>
+            <button
+              type="button"
+              class="tool-btn"
+              :disabled="!canRedo"
+              @click="rehacer"
+              title="Rehacer cambio (Ctrl+Y)"
+              aria-label="Rehacer">
+              ↷
+            </button>
+
+            <span class="toolbar-sep" aria-hidden="true"></span>
+
+            <button
+              type="button"
+              class="tool-btn fmt-bold"
+              @click="envolverFormato('fuerte', 'texto en negrita')"
+              title="Negrita #fuerte{...} (Ctrl+B)">
+              B
+            </button>
+            <button
+              type="button"
+              class="tool-btn fmt-italic"
+              @click="envolverFormato('cursiva', 'texto en cursiva')"
+              title="Cursiva #cursiva{...} (Ctrl+I)">
+              I
+            </button>
+            <button
+              type="button"
+              class="tool-btn fmt-underline"
+              @click="envolverFormato('subrayado', 'texto subrayado')"
+              title="Subrayado #subrayado{...}">
+              U
+            </button>
+
+            <span class="toolbar-sep" aria-hidden="true"></span>
+
+            <!-- Disparador de la Rueda Cromática Interactiva (#HEX) -->
+            <button
+              id="colorPickerTrigger"
+              type="button"
+              class="tool-btn color-trigger-btn"
+              popovertarget="colorWheelPopover"
+              @click="prepararColorPopover"
+              title="Abrir rueda cromática y paleta de colores #HEX">
+              <span class="color-swatch-dot" :style="{ backgroundColor: pickerHex }"></span>
+              <span class="color-hex-code">{{ pickerHex }}</span>
+            </button>
+          </div>
+
+          <div class="toolbar-group">
+            <button
+              type="button"
+              class="tool-btn snippet-toggle-btn"
+              :class="{ active: ribbonOpen }"
+              @click="ribbonOpen = !ribbonOpen"
+              title="Mostrar u ocultar barra de etiquetas rápidas">
+              Etiquetas {{ ribbonOpen ? '▴' : '▾' }}
+            </button>
+          </div>
         </div>
 
+        <!-- Cinta compacta de etiquetas rápidas (respeta Undo/Redo al 100%) -->
+        <nav v-show="ribbonOpen" class="snippet-ribbon" aria-label="Inserción rápida de comandos LATINEX">
+          <button
+            v-for="item in quickSnippets"
+            :key="item.label"
+            type="button"
+            class="snippet-btn"
+            :title="item.desc"
+            @click="insertarSnippet(item.code)">
+            {{ item.label }}
+          </button>
+        </nav>
+
+        <!-- Lienzo del editor con marca de agua estilo Overleaf -->
         <div class="editor-shell">
+          <!-- Marca de agua vectorial sutil (no interfiere con clics ni lectura) -->
+          <div class="editor-watermark" aria-hidden="true">
+            <svg width="150" height="150" viewBox="0 0 120 120" fill="none">
+              <circle cx="60" cy="60" r="52" stroke="currentColor" stroke-width="2.2" stroke-dasharray="6 5"/>
+              <path d="M88 30C62 31 40 46 31 74C43 67 55 66 67 69C80 57 87 43 88 30Z" fill="currentColor" fill-opacity="0.32"/>
+              <text x="60" y="76" text-anchor="middle" fill="currentColor" font-family="Inter, sans-serif" font-weight="800" font-size="34" letter-spacing="-1.5">Lx</text>
+            </svg>
+            <span>LATINEX COMPILER STUDIO</span>
+          </div>
+
           <pre ref="gutterRef" class="line-gutter" aria-hidden="true"><span
             v-for="n in totalLineas"
             :key="n"
             class="line-gutter-num"
-            :class="{ 'error-line': errorLine === n }">{{ n }}</span></pre>
+            :class="{
+              'error-line': errorLine === n,
+              'sync-line': syncHighlightLine === n,
+              'active-line': cursorLn === n && errorLine !== n && syncHighlightLine !== n
+            }">{{ n }}</span></pre>
 
           <textarea
             ref="editorRef"
@@ -263,67 +378,263 @@
         </div>
 
         <div class="editor-footer">
-          <span>Ln {{ cursorLn }}, Col {{ cursorCol }}</span>
-          <span>{{ codigoBytes }} / 65536 B (máx. 64 KB)</span>
+          <div class="editor-footer-left">
+            <span>Ln {{ cursorLn }}, Col {{ cursorCol }}</span>
+            <button
+              v-if="lineaActivaHex"
+              type="button"
+              class="inline-hex-pill"
+              popovertarget="colorWheelPopover"
+              @click="editarHexDeLinea(lineaActivaHex)"
+              :title="`Cambiar color ${lineaActivaHex} con la rueda cromática`">
+              <span class="color-swatch-dot" :style="{ backgroundColor: lineaActivaHex }"></span>
+              <span>Editar {{ lineaActivaHex }}</span>
+            </button>
+          </div>
+          <div class="editor-footer-right">
+            <span title="Pasos disponibles para deshacer">↶ {{ undoCount }}</span>
+            <span>{{ codigoBytes }} / 65536 B</span>
+          </div>
         </div>
       </section>
 
-      <!-- Panel Derecho: Visor de PDF / Vista Previa y Diagnóstico de Error -->
-      <section class="preview-pane" aria-label="Vista previa y resultado de compilación">
-        <div class="pane-subheader">
-          <span>Vista Previa del Documento</span>
-          <span class="compile-pill" :class="compilePillClass">{{ compileStatusText }}</span>
+      <!-- Divisor Central de Sincronización Bidireccional (igual a Overleaf) -->
+      <div class="sync-divider" role="group" aria-label="Sincronización entre código y PDF">
+        <button
+          type="button"
+          class="sync-arrow-btn"
+          @click="sincronizarEditorAPdf"
+          title="Sincronizar código → ubicación en PDF">
+          →
+        </button>
+        <button
+          type="button"
+          class="sync-arrow-btn"
+          @click="sincronizarPdfAEditorBoton"
+          title="Sincronizar PDF → línea de código">
+          ←
+        </button>
+      </div>
+
+      <!-- Panel Derecho: Visor A4 Profesional de Solo Lectura (PDF.js + SyncTeX) -->
+      <section class="preview-pane" aria-label="Vista previa PDF de solo lectura">
+        <div class="pdf-toolbar">
+          <div class="pdf-toolbar-left">
+            <button
+              type="button"
+              class="btn btn-compile btn-recompile"
+              :disabled="isCompiling"
+              @click="compilar"
+              title="Recompilar documento a PDF nativo (Ctrl+Enter)">
+              <span class="compile-icon" :class="{ spinning: isCompiling }" aria-hidden="true">↻</span>
+              <span>{{ isCompiling ? 'Compilando...' : 'Recompilar' }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              :disabled="!pdfDownloadBase64"
+              @click="descargarPdf"
+              title="Descargar archivo .pdf nativo (%PDF-1.4)">
+              ⬇ PDF
+            </button>
+
+            <span class="compile-pill" :class="compilePillClass">{{ compileStatusText }}</span>
+          </div>
+
+          <div v-if="pdfPagesCount > 0 && !errorPanel" class="pdf-toolbar-right">
+            <div class="page-nav-group" role="group" aria-label="Navegación de páginas">
+              <button
+                type="button"
+                class="tool-btn"
+                :disabled="currentPage <= 1"
+                @click="irAPaginaPdf(currentPage - 1)"
+                title="Página anterior">
+                ‹
+              </button>
+              <span class="page-counter">{{ currentPage }} / {{ pdfPagesCount }}</span>
+              <button
+                type="button"
+                class="tool-btn"
+                :disabled="currentPage >= pdfPagesCount"
+                @click="irAPaginaPdf(currentPage + 1)"
+                title="Página siguiente">
+                ›
+              </button>
+            </div>
+
+            <div class="zoom-group" role="group" aria-label="Zoom de vista previa">
+              <button type="button" class="tool-btn" @click="cambiarZoom(-0.12)" title="Alejar">−</button>
+              <button type="button" class="tool-btn zoom-pct-btn" @click="ajustarAnchoPdf" title="Restablecer ajuste de página">
+                {{ Math.round(pdfZoom * 100) }}%
+              </button>
+              <button type="button" class="tool-btn" @click="cambiarZoom(0.12)" title="Acercar">+</button>
+            </div>
+          </div>
         </div>
 
-        <div class="preview-stage">
+        <!-- Barra luminosa animada durante la compilación -->
+        <div class="compile-progress-track" :class="{ active: isCompiling }" aria-hidden="true">
+          <div class="compile-progress-bar"></div>
+        </div>
+
+        <!-- Píldora interactiva cuando seleccionas o haces clic en una palabra de la vista previa -->
+        <div v-if="selectedPdfHit && !errorPanel" class="synctex-banner">
+          <div class="synctex-banner-info">
+            <span class="synctex-badge">Línea {{ selectedPdfHit.linea }}</span>
+            <span class="synctex-snippet">“{{ selectedPdfHit.texto }}”</span>
+          </div>
+          <div class="synctex-banner-actions">
+            <button type="button" class="btn btn-sm" @click="irACodigoDesdeHit(selectedPdfHit)">
+              ← Ver código que lo generó
+            </button>
+            <button type="button" class="mini-action-btn" @click="selectedPdfHit = null" title="Cerrar aviso">✕</button>
+          </div>
+        </div>
+
+        <div ref="previewStageRef" class="preview-stage" @scroll="alHacerScrollPdf">
           <div v-if="errorPanel" class="error-card" role="alert">
-            <h2>{{ errorPanel.titulo }}</h2>
+            <h2>⚠ {{ errorPanel.titulo }}</h2>
             <div class="error-meta">{{ errorPanel.meta }}</div>
             <p style="margin: 0;">{{ errorPanel.mensaje }}</p>
             <div v-if="errorLine > 0">
-              <button type="button" class="btn btn-outline btn-sm" @click="irALinea(errorLine)">
-                Ir a línea {{ errorLine }} en el editor
+              <button type="button" class="btn btn-outline btn-sm" @click="irALinea(errorLine, true)">
+                ← Ir a línea {{ errorLine }} en el editor
               </button>
             </div>
           </div>
 
-          <iframe
-            v-else-if="pdfUrl"
-            class="pdf-frame"
-            :src="pdfUrl"
-            title="Visor PDF nativo generado por LATINEX"></iframe>
+          <!-- Hojas A4 renderizadas en <canvas> de solo lectura + Capa SyncTeX -->
+          <div
+            v-else-if="pdfPagesCount > 0 && !pdfjsFallback"
+            class="pdf-pages-stack"
+            :class="{ 'is-recompiling': isCompiling, 'pulse-compiled': justCompiledPulse }">
+            <article
+              v-for="pageNum in pdfPagesCount"
+              :key="pageNum"
+              :data-page="pageNum"
+              class="pdf-page-card"
+              :style="estiloHojaA4">
+              <canvas
+                :ref="(el) => setPdfCanvasRef(pageNum, el)"
+                class="pdf-page-canvas"></canvas>
 
-          <div v-else-if="compileResult" class="a4-preview-wrapper">
-            <div v-if="compileResult.ejecucion && !compileResult.ejecucion.implementado" class="frente2-banner">
-              <strong>Fases 1–3 ACEPTADAS ({{ compileResult.totalTokens }} tokens, {{ sintacticoPasos.length }} transiciones, {{ tablaSimbolos.length }} símbolos).</strong>
-              Vista previa estructural en vivo; el binario <code>%PDF-1.4</code> nativo se mostrará aquí al completarse Frente 2 (<code>PdfGenerator.php</code>).
-            </div>
-
-            <article class="a4-sheet">
-              <h2 class="a4-title">{{ previewData.titulo }}</h2>
-              <p v-if="previewData.autor" class="a4-author">Por {{ previewData.autor }}</p>
-
-              <template v-for="(bloque, idx) in previewData.bloques" :key="idx">
-                <h3 v-if="bloque.tipo === 'seccion'" class="a4-heading">{{ bloque.texto }}</h3>
-                <div v-else-if="bloque.tipo === 'caja'" class="a4-box" :class="bloque.estilo">{{ bloque.texto }}</div>
-                <p v-else class="a4-paragraph">{{ bloque.texto }}</p>
-              </template>
-
-              <div v-if="previewData.bloques.length === 0" class="a4-code-fallback">
-                Documento compilado sin errores. Usa #titulo, #seccion, #texto, #lista o #caja para ver estructura en la hoja.
+              <!-- Capa interactiva SyncTeX de solo lectura: clic o selección vincula al código .ltx -->
+              <div class="pdf-synctex-layer" title="Selecciona o haz doble clic sobre cualquier elemento para ir a su código .ltx">
+                <div
+                  v-for="(hit, hIdx) in elementosPorPagina(pageNum)"
+                  :key="hIdx"
+                  class="synctex-hit"
+                  :class="{
+                    'active-sync': activeSyncHit && activeSyncHit.id === hit.id,
+                    'selected-sync': selectedPdfHit && selectedPdfHit.id === hit.id
+                  }"
+                  :style="estiloCajaSync(hit)"
+                  :title="`Línea ${hit.linea} · Doble clic para ir al código`"
+                  @click.stop="alClicElementoPdf(hit)"
+                  @dblclick.stop="alDobleClicElementoPdf(hit)">
+                  <span class="synctex-selectable">{{ hit.texto }}</span>
+                </div>
               </div>
+
+              <footer class="pdf-page-badge">Página {{ pageNum }} de {{ pdfPagesCount }}</footer>
             </article>
           </div>
 
+          <!-- Mensaje limpio si no hubiera conexión a PDF.js CDN -->
+          <div v-else-if="pdfUrl && pdfjsFallback" class="empty-preview">
+            <strong>PDF generado correctamente</strong>
+            <p style="margin: 0; font-size: 0.84rem;">Usa el botón <strong>⬇ PDF</strong> superior para descargar el documento <code>%PDF-1.4</code>.</p>
+          </div>
+
           <div v-else class="empty-preview">
+            <svg width="68" height="68" viewBox="0 0 120 120" fill="none" aria-hidden="true" style="opacity: 0.35; margin-inline: auto;">
+              <rect x="14" y="14" width="92" height="92" rx="22" stroke="currentColor" stroke-width="4"/>
+              <text x="60" y="73" text-anchor="middle" fill="currentColor" font-family="Inter, sans-serif" font-weight="800" font-size="40">Lx</text>
+            </svg>
             <strong>Listo para compilar</strong>
-            <p style="margin: 0; font-size: 0.85rem;">
-              Presiona <strong>▶ Compilar</strong> (o <code>Ctrl+Enter</code>) para ejecutar las fases Léxico, Sintáctico, Semántico y Ejecución.
+            <p style="margin: 0; font-size: 0.84rem;">
+              Pulsa <strong>Recompilar</strong> (o <code>Ctrl+Enter</code>) para generar el documento A4 en <code>%PDF-1.4</code> nativo.
             </p>
           </div>
         </div>
       </section>
     </main>
+
+    <!-- Popover Flotante: Rueda Cromática HSV + Paleta de Colores #HEX -->
+    <div ref="colorPopoverRef" id="colorWheelPopover" popover="auto" class="color-popover">
+      <div class="color-popover-header">
+        <strong>Selector Cromático #HEX</strong>
+        <button
+          type="button"
+          class="mini-action-btn"
+          popovertarget="colorWheelPopover"
+          popovertargetaction="hide"
+          title="Cerrar paleta">
+          ✕
+        </button>
+      </div>
+
+      <div class="color-wheel-wrap">
+        <canvas
+          ref="colorWheelCanvasRef"
+          width="184"
+          height="184"
+          class="color-wheel-canvas"
+          @pointerdown="iniciarArrastreRueda"></canvas>
+      </div>
+
+      <div class="brightness-row">
+        <label for="brightnessRange">Brillo</label>
+        <input
+          id="brightnessRange"
+          type="range"
+          min="10"
+          max="100"
+          v-model.number="pickerVal"
+          @input="actualizarDesdeBrillo">
+        <span>{{ pickerVal }}%</span>
+      </div>
+
+      <div class="hex-input-row">
+        <span class="hex-preview-box" :style="{ backgroundColor: pickerHex }"></span>
+        <input
+          type="text"
+          class="hex-text-input"
+          v-model="pickerHexInput"
+          maxlength="7"
+          spellcheck="false"
+          aria-label="Código de color hexadecimal"
+          @change="aplicarHexManual">
+        <button type="button" class="btn btn-outline btn-sm" @click="copiarHexPortapapeles">
+          {{ hexCopiado ? '✓ Copiado' : 'Copiar' }}
+        </button>
+      </div>
+
+      <div class="preset-swatches" role="group" aria-label="Colores académicos frecuentes">
+        <button
+          v-for="sw in presetColors"
+          :key="sw.hex"
+          type="button"
+          class="preset-swatch-btn"
+          :class="{ selected: pickerHex.toUpperCase() === sw.hex }"
+          :style="{ backgroundColor: sw.hex }"
+          :title="`${sw.name} (${sw.hex})`"
+          @click="seleccionarColorPreset(sw.hex)"></button>
+      </div>
+
+      <div class="color-insert-actions">
+        <button type="button" class="btn btn-sm" @click="insertarColorAtributo">
+          Aplicar color={{ pickerHex }}
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" @click="envolverConColor('texto')">
+          #texto(color=...)
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" @click="envolverConColor('resaltado')">
+          #resaltado
+        </button>
+      </div>
+    </div>
 
     <!-- Cajón inferior plegable: Inspector de las 4 Fases del Compilador -->
     <section class="inspector-dock" aria-label="Inspector de las 4 fases del compilador">
@@ -366,7 +677,7 @@
             :class="{ active: inspectorOpen && activeTab === 'ejecucion' }"
             @click="seleccionarTab('ejecucion')">
             <span class="phase-dot" :class="estadoFaseClass('ejecucion')"></span>
-            4. Ejecución
+            4. Ejecución ({{ ejecucionElementosLista.length }})
           </button>
         </div>
 
@@ -375,105 +686,146 @@
           class="btn btn-outline btn-sm"
           :aria-expanded="inspectorOpen ? 'true' : 'false'"
           @click="inspectorOpen = !inspectorOpen">
-          {{ inspectorOpen ? '▼ Ocultar Inspector' : '▲ Mostrar 4 Fases' }}
+          {{ inspectorOpen ? '▼ Ocultar Inspector' : '▲ Inspector 4 Fases' }}
         </button>
       </div>
 
       <div v-show="inspectorOpen" class="inspector-body">
         <!-- Pestaña 1: Léxico -->
-        <div v-if="activeTab === 'lexico'">
+        <div v-if="activeTab === 'lexico'" class="inspector-pane-inner">
           <div class="inspector-toolbar">
             <span>
-              {{ showLexicalRef ? 'Especificación Oficial de Tokens LATINEX' : 'Tokens detectados en el código fuente' }}
+              {{ showLexicalRef ? `Especificación Oficial de Tokens LATINEX (${filteredLexicalReference.length}/${lexicalCount})` : 'Tokens detectados en el documento actual' }}
             </span>
-            <button type="button" class="btn btn-outline btn-sm" @click="alternarReferenciaLexica">
-              {{ showLexicalRef ? 'Ver Tokens Analizados' : 'Ver Tabla Oficial (78)' }}
-            </button>
+            <div class="inspector-toolbar-actions">
+              <input
+                v-if="showLexicalRef"
+                type="search"
+                class="inspector-search"
+                v-model="lexicalSearch"
+                placeholder="Filtrar token, lexema o categoría...">
+              <button type="button" class="btn btn-outline btn-sm" @click="alternarReferenciaLexica">
+                {{ showLexicalRef ? 'Ver Tokens del Documento' : `Ver Tabla Oficial (${lexicalCount})` }}
+              </button>
+            </div>
           </div>
 
-          <table v-if="!showLexicalRef" class="data-table">
-            <thead>
-              <tr><th>Cód</th><th>Nombre</th><th>Lexema</th><th>Categoría</th><th>Ln</th><th>Col</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="(t, i) in tokensAnalizados" :key="i">
-                <td>{{ t.token }}</td>
-                <td :style="{ color: colorDeToken(t.tipo), fontWeight: 600 }">{{ t.nombre }}</td>
-                <td>{{ t.lexema ?? 'null' }}</td>
-                <td><span class="token-badge" :style="badgeStyle(t.tipo)">{{ t.tipo }}</span></td>
-                <td>{{ t.linea }}</td>
-                <td>{{ t.columna }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-scroll-box">
+            <table v-if="!showLexicalRef" class="data-table">
+              <thead>
+                <tr><th>Cód</th><th>Nombre</th><th>Lexema</th><th>Categoría</th><th>Ln</th><th>Col</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(t, i) in tokensAnalizados" :key="i" class="clickable-row" @click="irALinea(t.linea, true)">
+                  <td>{{ t.token }}</td>
+                  <td :style="{ color: colorDeToken(t.tipo), fontWeight: 600 }">{{ t.nombre }}</td>
+                  <td>{{ t.lexema ?? 'null' }}</td>
+                  <td><span class="token-badge" :style="badgeStyle(t.tipo)">{{ t.tipo }}</span></td>
+                  <td>{{ t.linea }}</td>
+                  <td>{{ t.columna }}</td>
+                </tr>
+              </tbody>
+            </table>
 
-          <table v-else class="data-table">
-            <thead>
-              <tr><th>Cód</th><th>Nombre</th><th>Lexema Base</th><th>Categoría</th><th>Descripción</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="e in lexicalReference" :key="e.token">
-                <td>{{ e.token }}</td>
-                <td :style="{ color: colorDeToken(e.categoria), fontWeight: 600 }">{{ e.nombre }}</td>
-                <td>{{ e.lexema ?? '—' }}</td>
-                <td><span class="token-badge" :style="badgeStyle(e.categoria)">{{ e.categoria }}</span></td>
-                <td>{{ e.descripcion }}</td>
-              </tr>
-            </tbody>
-          </table>
+            <table v-else class="data-table">
+              <thead>
+                <tr><th>Cód</th><th>Nombre</th><th>Lexema Base</th><th>Categoría</th><th>Descripción</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(e, idx) in filteredLexicalReference" :key="`${e.token}-${idx}`">
+                  <td>{{ e.token }}</td>
+                  <td :style="{ color: colorDeToken(e.categoria), fontWeight: 600 }">{{ e.nombre }}</td>
+                  <td>{{ e.lexema ?? '—' }}</td>
+                  <td><span class="token-badge" :style="badgeStyle(e.categoria)">{{ e.categoria }}</span></td>
+                  <td>{{ e.descripcion }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Pestaña 2: Sintáctico -->
-        <div v-else-if="activeTab === 'sintactico'">
+        <div v-else-if="activeTab === 'sintactico'" class="inspector-pane-inner">
           <div class="inspector-toolbar">
-            <span>Autómata con pila de 22 estados (0–21) · Estado: {{ compileResult?.sintactico?.estado || 'SIN EJECUTAR' }}</span>
+            <span>Autómata con pila de 22 estados (Q0–Q21) · Estado: <strong>{{ compileResult?.sintactico?.estado || 'SIN EJECUTAR' }}</strong></span>
           </div>
-          <table class="data-table">
-            <thead>
-              <tr><th>Paso</th><th>Estado Actual</th><th>Token</th><th>Nombre Token</th><th>Lexema</th><th>Ln:Col</th><th>Estado Sig.</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="s in sintacticoPasos" :key="s.paso">
-                <td>{{ s.paso }}</td>
-                <td>{{ s.estadoActual }}</td>
-                <td>{{ s.token }}</td>
-                <td>{{ s.nombreToken }}</td>
-                <td>{{ s.lexema ?? '' }}</td>
-                <td>{{ s.linea }}:{{ s.columna }}</td>
-                <td><strong>{{ s.estadoSiguiente }}</strong></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-scroll-box">
+            <table class="data-table">
+              <thead>
+                <tr><th>Paso</th><th>Estado Actual</th><th>Token</th><th>Nombre Token</th><th>Lexema</th><th>Ln:Col</th><th>Estado Sig.</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in sintacticoPasos" :key="s.paso" class="clickable-row" @click="irALinea(s.linea, true)">
+                  <td>{{ s.paso }}</td>
+                  <td>Q{{ s.estadoActual }}</td>
+                  <td>{{ s.token }}</td>
+                  <td>{{ s.nombreToken }}</td>
+                  <td>{{ s.lexema ?? '' }}</td>
+                  <td>{{ s.linea }}:{{ s.columna }}</td>
+                  <td><strong>Q{{ s.estadoSiguiente }}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Pestaña 3: Semántico -->
-        <div v-else-if="activeTab === 'semantico'">
+        <div v-else-if="activeTab === 'semantico'" class="inspector-pane-inner">
           <div class="inspector-toolbar">
-            <span>Tabla de Símbolos (MACRO, ETIQUETA, METADATO) · Estado: {{ compileResult?.semantico?.estado || 'SIN EJECUTAR' }}</span>
+            <span>Tabla de Símbolos (MACRO, ETIQUETA, METADATO) · Estado: <strong>{{ compileResult?.semantico?.estado || 'SIN EJECUTAR' }}</strong></span>
           </div>
-          <table class="data-table">
-            <thead>
-              <tr><th>Lexema</th><th>Token</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Ln:Col</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="(sym, i) in tablaSimbolos" :key="i">
-                <td><strong>{{ sym.lexema }}</strong></td>
-                <td>{{ sym.token }}</td>
-                <td>{{ sym.tipo }}</td>
-                <td>{{ typeof sym.valor === 'object' ? JSON.stringify(sym.valor) : (sym.valor ?? '—') }}</td>
-                <td>{{ sym.estado }}</td>
-                <td>{{ sym.linea }}:{{ sym.columna }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-scroll-box">
+            <table class="data-table">
+              <thead>
+                <tr><th>Lexema</th><th>Token</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Ln:Col</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(sym, i) in tablaSimbolos" :key="i" class="clickable-row" @click="irALinea(sym.linea, true)">
+                  <td><strong>{{ sym.lexema }}</strong></td>
+                  <td>{{ sym.token }}</td>
+                  <td>{{ sym.tipo }}</td>
+                  <td>{{ typeof sym.valor === 'object' ? JSON.stringify(sym.valor) : (sym.valor ?? '—') }}</td>
+                  <td>{{ sym.estado }}</td>
+                  <td>{{ sym.linea }}:{{ sym.columna }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <!-- Pestaña 4: Ejecución -->
-        <div v-else-if="activeTab === 'ejecucion'">
-          <div class="inspector-toolbar">
-            <span>Motor Two-Pass A4 y PDF Binario · Estado: {{ compileResult?.ejecucion?.estado || 'SIN EJECUTAR' }}</span>
+        <!-- Pestaña 4: Ejecución (Tarjetas KPI + Tabla IR Geométrica clicable) -->
+        <div v-else-if="activeTab === 'ejecucion'" class="inspector-pane-inner">
+          <div class="kpi-strip">
+            <div v-for="kpi in ejecucionResumenKpis" :key="kpi.label" class="kpi-card">
+              <span class="kpi-label">{{ kpi.label }}</span>
+              <strong class="kpi-val">{{ kpi.value }}</strong>
+            </div>
           </div>
-          <pre style="margin: 0; font-family: 'Fira Code', monospace; font-size: 0.76rem; color: #cbd5e1;">{{ JSON.stringify(ejecucionInspector, null, 2) }}</pre>
+
+          <div class="table-scroll-box">
+            <table class="data-table">
+              <thead>
+                <tr><th>#</th><th>Pág</th><th>Primitiva</th><th>Coordenadas PDF (pt)</th><th>Fuente / Detalle</th><th>Línea .ltx</th></tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(el, idx) in ejecucionElementosLista"
+                  :key="idx"
+                  class="clickable-row"
+                  @click="el.linea > 0 && irALinea(el.linea, true)">
+                  <td>{{ idx + 1 }}</td>
+                  <td>Pág {{ el.pagina }}</td>
+                  <td><span class="ir-type-pill" :class="el.tipo">{{ el.tipo }}</span></td>
+                  <td>{{ el.coords }}</td>
+                  <td>{{ el.detalle }}</td>
+                  <td>
+                    <span v-if="el.linea > 0" class="ln-jump-badge">Ln {{ el.linea }} ↵</span>
+                    <span v-else>—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -503,9 +855,8 @@
           </button>
         </div>
 
-        <div v-if="authError" class="form-error" role="alert">{{ authError }}</div>
+        <div v-if="authError" class="form-error" role="alert">⚠ {{ authError }}</div>
 
-        <!-- Formulario de Login -->
         <form v-if="authMode === 'login'" class="modal-form" @submit.prevent="enviarLogin">
           <div class="field-group">
             <label for="login-email">Correo electrónico</label>
@@ -550,7 +901,6 @@
           </div>
         </form>
 
-        <!-- Formulario de Registro -->
         <form v-else class="modal-form" @submit.prevent="enviarRegistro">
           <div class="field-group">
             <label for="register-name">Nombre completo</label>
@@ -620,7 +970,7 @@
           <button type="button" class="btn btn-outline btn-sm" @click="cerrarDialog('newDoc')">Cerrar</button>
         </div>
 
-        <div v-if="docModalError" class="form-error" role="alert">{{ docModalError }}</div>
+        <div v-if="docModalError" class="form-error" role="alert">⚠ {{ docModalError }}</div>
 
         <form class="modal-form" @submit.prevent="confirmarNuevoDoc">
           <div class="field-group">
@@ -658,7 +1008,7 @@
           <button type="button" class="btn btn-outline btn-sm" @click="cerrarDialog('renameDoc')">Cerrar</button>
         </div>
 
-        <div v-if="docModalError" class="form-error" role="alert">{{ docModalError }}</div>
+        <div v-if="docModalError" class="form-error" role="alert">⚠ {{ docModalError }}</div>
 
         <form class="modal-form" @submit.prevent="confirmarRenombrarDoc">
           <div class="field-group">

@@ -147,6 +147,8 @@ class Ejecutor
 
     private float $yLogica = self::MARGEN_SUP;
 
+    private int $lineaFuenteActual = 1;
+
     /** @var int[] Contadores jerárquicos [n1, n2, n3, n4, n5] */
     private array $contadoresSeccion = [0, 0, 0, 0, 0];
 
@@ -629,6 +631,7 @@ class Ejecutor
         $this->metadatos         = [];
         $this->paginaActual      = 1;
         $this->yLogica           = self::MARGEN_SUP;
+        $this->lineaFuenteActual = 1;
         $this->contadoresSeccion = [0, 0, 0, 0, 0];
         $this->contadorEcuacion  = 0;
         $this->macrosNodos       = [];
@@ -671,6 +674,9 @@ class Ejecutor
         };
 
         foreach ($nodos as $nodo) {
+            if (!empty($nodo['startLn'])) {
+                $this->lineaFuenteActual = (int) $nodo['startLn'];
+            }
             $tipoNodo = $nodo['node'];
 
             if ($tipoNodo === 'definir') {
@@ -1611,6 +1617,7 @@ class Ejecutor
                     'pxAncho' => $pxAncho,
                     'pxAlto'  => $pxAlto,
                     'canales' => $canales,
+                    'linea'   => $this->lineaFuenteActual,
                 ];
             } else {
                 // Recuadro vectorial de marcador en caso de imagen externa no subida aún
@@ -2346,6 +2353,7 @@ class Ejecutor
             'color'   => $color,
             'tw'      => round($tw, 3),
             'texto'   => $texto,
+            'linea'   => $this->lineaFuenteActual,
         ];
     }
 
@@ -2374,6 +2382,7 @@ class Ejecutor
             'relleno'     => $relleno,
             'borde'       => $borde,
             'grosorBorde' => round($grosorBorde, 2),
+            'linea'       => $this->lineaFuenteActual,
         ];
     }
 
@@ -2398,6 +2407,7 @@ class Ejecutor
             'y2Pdf'    => round(self::ALTO_PAGINA - $y2Logica, 2),
             'color'    => $color,
             'grosor'   => round($grosor, 2),
+            'linea'    => $this->lineaFuenteActual,
         ];
     }
 
